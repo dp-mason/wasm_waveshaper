@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <title>wasm-waveshaper</title>
+    <style>
+      body {
+        padding: 0;
+      }
+      div {
+        margin: 0;
+      }
+    </style>
+    <link rel="preload" href="./index.js" as="script" crossorigin="anonymous" />
+    <script type="module" src="./index.js" ></script>
+  </head>
+  <body>
+    <script type="module">
+      import init, { run } from "./pkg/wasm_waveshaper.js";
+      init().then(() => {
+        console.log("WASM Loaded");
+      });
+    </script>
+    <div id="ui-box"></div>
+    <button id="enable_audio_button">ENABLE AUDIO</button>
+  </body>
+</html>
