@@ -2,7 +2,7 @@
 import * as wasm from './pkg/wasm_waveshaper.js';
 
 // Get a reference to the button element
-const button = document.getElementById('ui-box');
+const button = document.getElementById('enable_audio_button');
 
 // Add a click event listener to the button
 button.addEventListener('click', () => {

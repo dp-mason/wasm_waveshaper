@@ -1,1 +1,1 @@
-wasm-pack build --target web --release; basic-http-server
+wasm-pack build --target web; basic-http-server

@@ -631,12 +631,12 @@ impl State {
         Ok(())
     }
 
-    pub fn handle_rendering_events(&mut self, event:Event<()>, control_flow:&mut ControlFlow) {
+    pub fn handle_rendering_events(&mut self, event:&Event<()>, control_flow:&mut ControlFlow) {
         match event {
             Event::WindowEvent {
                 ref event,
                 window_id,
-            } if window_id == self.window().id() => {
+            } if window_id == &self.window().id() => {
                 if !self.input(event) {
                     // UPDATED!
                     match event {
@@ -661,7 +661,7 @@ impl State {
                     }
                 }
             }
-            Event::RedrawRequested(window_id) if window_id == self.window().id() => {
+            Event::RedrawRequested(window_id) if window_id == &self.window().id() => {
                 self.update();
                 match self.render() {
                     Ok(_) => {}
