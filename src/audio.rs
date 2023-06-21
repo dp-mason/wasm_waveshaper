@@ -8,6 +8,7 @@ use winit::{
 
 mod audio_utils;
 
+// TODO: figure out if there is a way to move the waveshaping function outside of the init function and store it separately in the AudioState
 pub struct AudioState {
     audio_device:Option<&'static mut dyn BaseAudioOutputDevice>,
 }
@@ -17,6 +18,9 @@ impl AudioState{
         AudioState{ audio_device:None }
     }
 
+    // TODO: add new wave shape functions
+
+    // TODO: modify this function so that it changes the waveshaping function of the audio state rather than creating a new device
     pub fn play_sine() {
         log::warn!("Hello from play_sine");
 
@@ -57,6 +61,8 @@ impl AudioState{
             channel_sample_count: 4410,
         };
 
+        // TODO: silence is the default upon init
+
         let device: Box<dyn BaseAudioOutputDevice> = run_output_device(params, {
             let mut clock = 0f32;
             move |data| {
@@ -84,7 +90,9 @@ impl AudioState{
                         if button == &winit::event::MouseButton::Left {
                             match &self.audio_device {
                                 None => self.audio_device = Some(Self::init_audio()),
-                                Some(device) => {}
+                                Some(device) => {
+                                    // TODO: cycle though different wave shapes each click
+                                }
                             }
                         }
                     },
