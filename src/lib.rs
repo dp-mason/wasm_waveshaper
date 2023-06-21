@@ -13,7 +13,7 @@ use tinyaudio::prelude::*;
 
 pub struct ShaperState {
     render_state:rendering::State,
-    audio_device:Option<&'static mut dyn BaseAudioOutputDevice>,
+    audio_state:audio::AudioState
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
@@ -21,40 +21,17 @@ pub async fn run() {
 
     // setup rendering state and attach a window that can be rendered to
     let (mut event_loop, mut render_state) = rendering::State::init_rendering().await;
+    let mut audio_state = audio::AudioState::new();
 
+    // setup the audio waveshaper state and store it in this struct
     let mut program_state = ShaperState{
         render_state,
-        audio_device:None
+        audio_state
     };
     
     event_loop.run( move |event, _, control_flow| {
         program_state.render_state.handle_rendering_events(&event, control_flow);
-        
-        
-        
-        //TODO: move event handling logic somwhere else
-        match event {
-            Event::WindowEvent {event,..} => {
-                match event {
-                    WindowEvent::MouseInput { device_id, state, button, modifiers } => {
-                        if button == winit::event::MouseButton::Left {
-                            match &program_state.audio_device {
-                                None => program_state.audio_device = Some(audio::init_audio()),
-                                Some(device) => {}
-                            }
-                        }
-                    },
-                    _ => {}
-                }
-            },
-            _ => {}
-        } 
-        
+        program_state.audio_state.handle_audio_events(&event, control_flow);
     });
-}
-
-#[wasm_bindgen]
-pub fn play_sine_wave() {
-    //log::warn!("Hello From Wasm Function");
-    audio::play_sine();
+    
 }
