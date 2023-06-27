@@ -13,7 +13,7 @@ use winit::{
 };
 
 mod audio_utils;
-
+#[derive(Clone, Copy)]
 enum WaveState{
     Silence,
     Sine,
@@ -29,41 +29,6 @@ impl AudioState{
         AudioState{ audio_device:None, wave_state: WaveState::Silence }
     }
 
-    // fn init_audio_device(&self) -> &'static mut dyn BaseAudioOutputDevice {
-    //     log::info!("Hello from init audio device");
-
-    //     audio_utils::set_panic_hook();
-
-    //     let audio_state_clone = self.clone();
-
-        
-
-    //     let device = run_output_device(params, {
-    //         let mut clock = 0f32;
-    //         move |data| {
-    //             for channels in data.chunks_mut(params.channels_count) {
-    //                 clock = (clock + 1.0) % params.sample_rate as f32;
-                    
-    //                 let mut value = 0.0;
-                    
-    //                 match wave_state {
-    //                     WaveState::Silence => {},
-    //                     WaveState::Sine => { value = (clock * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin() },
-    //                     WaveState::Square => {},
-    //                     _ => {}
-    //                 }
-                    
-    //                 for sample in channels {
-    //                     *sample = value;
-    //                 }
-    //             }
-    //         }
-    //     })
-    //     .unwrap();
-
-    //     Box::leak(device)
-    // }
-
     pub fn render(&mut self, buf: &mut [(f32, f32)], params: tinyaudio::OutputDeviceParameters) {
         buf.fill((0.0, 0.0));
 
@@ -72,7 +37,15 @@ impl AudioState{
         // Fill based on sine wave
         for chan_tuple in buf {
             clock = (clock + 1.0) % params.sample_rate as f32;
-            let value = (clock * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin();
+
+            let mut value: f32 = 0.0;
+            
+            match self.wave_state {
+                WaveState::Silence => {},
+                WaveState::Sine => { value = (clock * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin(); },
+                WaveState::Square => { value = 0.0 } // TODO: placeholder function
+            }
+            
             chan_tuple.0 = value;
             chan_tuple.1 = value;
         }
@@ -154,7 +127,7 @@ impl SoundEngine {
             Event::WindowEvent {event,..} => {
                 match event {
                     WindowEvent::MouseInput { device_id, state, button, modifiers } => {
-                        if button == &winit::event::MouseButton::Left {
+                        if button == &winit::event::MouseButton::Left && state == &winit::event::ElementState::Pressed {
                             //TODO: this is sloppy, avoids recursive mutex unlock though
                             let mut already_init:bool = false;
                             match &self.state().audio_device {
@@ -164,7 +137,14 @@ impl SoundEngine {
                             if !already_init {
                                 self.initialize_audio_output_device();
                             } else {
+                                log::warn!("Hello from state changing");
                                 //TODO: change wave state
+                                let curr_state = self.state().wave_state;
+                                self.state().wave_state = match curr_state {
+                                    WaveState::Silence => { WaveState::Sine },
+                                    WaveState::Sine => { WaveState::Silence },
+                                    WaveState::Square => { WaveState::Silence }
+                                };
                             }
                         }
                     },
