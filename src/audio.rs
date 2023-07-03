@@ -122,7 +122,7 @@ impl SoundEngine {
         self.0.lock().unwrap()
     }
 
-    pub fn handle_audio_events(&mut self, event: &Event<()>, control_flow: &mut ControlFlow){
+    pub fn handle_audio_maintenance_events(&mut self, event: &Event<()>, control_flow: &mut ControlFlow){
         match event {
             Event::WindowEvent {event,..} => {
                 match event {

@@ -60,7 +60,7 @@ impl CircleInstance {
 // define triangles that fill the screen
 // to accomodate this setup in the render pipeline config settings, the topology is set to "strip"
 const VERTICES:&[Vertex] = &[
-    // background 
+    // background filling triangles
     Vertex{position: [ 1.0,  1.0, 1.0], color: [1.0, 0.0, 0.0]}, // top right
     Vertex{position: [-1.0,  1.0, 1.0], color: [0.0, 0.0, 0.0]}, // top left
     Vertex{position: [ 1.0, -1.0, 1.0], color: [1.0, 1.0, 0.0]}, // bottom right
@@ -89,7 +89,7 @@ const VERTICES:&[Vertex] = &[
 const CIRCLE_START_OFFSET:u16 = 3; // would be four, but wavefront obj format starts indexing from one for some reason
 
 const TRI_INDEX_BUFFER:&[u16] = &[
-    // Background Triangles
+    // Background Filling Triangles
     2, 0, 1,
     2, 1, 3,
     
@@ -476,6 +476,33 @@ impl State {
         // TODO: write new size to graphics input
     }
 
+    pub fn add_circle_at_cursor_location(&mut self, state:&ElementState, button:&MouseButton){
+        match state {
+            ElementState::Pressed => {
+                // TODO: turn this block into its own function
+                let cursor_clip_x = ((self.cursor_pos[0] / self.size.width as f32 ) - 0.5) * 2.0;
+                let cursor_clip_y = ((self.cursor_pos[1] / self.size.height as f32) - 0.5) * -2.0;
+                let cursor_world_pos = dot_product(self.clip_to_world_transform, [cursor_clip_x, cursor_clip_y, 0.0, 1.0]);
+                
+                // determine whether the clicked position is within an existing circle
+                match self.circle_at_location([cursor_world_pos[0], cursor_world_pos[1]]) {
+                    Some(index) => {
+                        log::warn!("Clicked circle at index: {index}");
+                        match self.expand_circle(index) {
+                            Err(msg) => log::warn!("{msg}"),
+                            Ok(_) => {}
+                        }
+                    },
+                    None => {
+                        log::warn!("new circle created at world location: {:?}", cursor_world_pos);
+                        self.add_circle_instance([cursor_world_pos[0], cursor_world_pos[1], cursor_world_pos[2]], 0.2);
+                    }
+                }
+            },
+            ElementState::Released => {/* TODO, could add another UI effect when the button is released, like a ripple */}
+        }
+    }
+
     // this is where more user input for rendering can be added
     pub fn input(&mut self, event: &WindowEvent) -> bool {
         // match to some input events you want to handle
@@ -497,33 +524,6 @@ impl State {
                         [self.cursor_pos[0], self.cursor_pos[1], 0.0f32, 1.0f32]
                     ]]));
                 
-                true
-            },
-            WindowEvent::MouseInput { state, .. } => {
-                match state {
-                    ElementState::Pressed => {
-                        let cursor_clip_x = ((self.cursor_pos[0] / self.size.width as f32 ) - 0.5) * 2.0;
-                        let cursor_clip_y = ((self.cursor_pos[1] / self.size.height as f32) - 0.5) * -2.0;
-                        let cursor_world_pos = dot_product(self.clip_to_world_transform, [cursor_clip_x, cursor_clip_y, 0.0, 1.0]);
-                        
-                        // determine whether the clicked position is within an existing circle
-                        match self.circle_at_location([cursor_world_pos[0], cursor_world_pos[1]]) {
-                            Some(index) => {
-                                log::warn!("Clicked circle at index: {index}");
-                                match self.expand_circle(index) {
-                                    Err(msg) => log::warn!("{msg}"),
-                                    Ok(_) => {}
-                                }
-                            },
-                            None => {
-                                log::warn!("new circle created at world location: {:?}", cursor_world_pos);
-                                self.add_circle_instance([cursor_world_pos[0], cursor_world_pos[1], cursor_world_pos[2]], 1.0);
-                            }
-                        }
-                    },
-                    ElementState::Released => {/* TODO */}
-                }
-
                 true
             },
             _ => false
@@ -631,7 +631,7 @@ impl State {
         Ok(())
     }
 
-    pub fn handle_rendering_events(&mut self, event:&Event<()>, control_flow:&mut ControlFlow) {
+    pub fn handle_window_maintenance_events(&mut self, event:&Event<()>, control_flow:&mut ControlFlow) {
         match event {
             Event::WindowEvent {
                 ref event,
