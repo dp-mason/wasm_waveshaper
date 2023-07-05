@@ -476,17 +476,18 @@ impl State {
         // TODO: write new size to graphics input
     }
 
-    pub fn get_cursor_world_location(&self) -> [f32;4] {
+    pub fn get_cursor_clip_location(&self) -> [f32;4] {
         let cursor_clip_x = ((self.cursor_pos[0] / self.size.width as f32 ) - 0.5) * 2.0;
         let cursor_clip_y = ((self.cursor_pos[1] / self.size.height as f32) - 0.5) * -2.0;
-        dot_product(self.clip_to_world_transform, [cursor_clip_x, cursor_clip_y, 0.0, 1.0])
+        [cursor_clip_x, cursor_clip_y, 0.0, 1.0]
     }
 
     pub fn add_circle_at_cursor_location(&mut self, state:&ElementState, button:&MouseButton){
         match state {
             ElementState::Pressed => {
                 
-                let cursor_world_pos = self.get_cursor_world_location();
+                let cursor_clip_pos = self.get_cursor_clip_location();
+                let cursor_world_pos = dot_product(self.clip_to_world_transform, cursor_clip_pos);
                 
                 // determine whether the clicked position is within an existing circle
                 match self.circle_at_location([cursor_world_pos[0], cursor_world_pos[1]]) {
