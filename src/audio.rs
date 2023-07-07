@@ -140,12 +140,13 @@ impl SoundEngine {
                                 self.initialize_audio_output_device();
                             } else {
                                 log::warn!("Hello from state changing");
-                                //TODO: change wave state
+                                // This is just a bit of code that would show that I ca change the render function output by clicking, will be removed soon
                                 let curr_state = self.state().wave_state;
                                 self.state().wave_state = match curr_state {
                                     WaveState::Silence => { WaveState::Sine },
                                     WaveState::Sine => { WaveState::Silence },
-                                    WaveState::Square => { WaveState::Silence }
+                                    WaveState::Square => { WaveState::Silence },
+                                    WaveState::CustomShape => { WaveState::Silence },
                                 };
                             }
                         }
