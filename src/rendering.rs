@@ -482,6 +482,26 @@ impl State {
         [cursor_clip_x, cursor_clip_y, 0.0, 1.0]
     }
 
+    pub fn add_circle_at_clip_location(&mut self, clip_loc:[f32;4]){
+                
+        let world_loc = dot_product(self.clip_to_world_transform, clip_loc);
+            
+        // determine whether the clicked position is within an existing circle
+        match self.circle_at_location([world_loc[0], world_loc[1]]) {
+            Some(index) => {
+                log::warn!("Clicked circle at index: {index}");
+                match self.expand_circle(index) {
+                    Err(msg) => log::error!("EXPAND CIRCLE ERR: {msg}"),
+                    _ => {},
+                }
+            },
+            None => {
+                log::warn!("new circle created at world location: {:?}", world_loc);
+                self.add_circle_instance([world_loc[0], world_loc[1], world_loc[2]], 0.2);
+            }
+        }
+    }
+
     pub fn add_circle_at_cursor_location(&mut self, state:&ElementState, button:&MouseButton){
         match state {
             ElementState::Pressed => {

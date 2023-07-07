@@ -17,7 +17,8 @@ mod audio_utils;
 enum WaveState{
     Silence,
     Sine,
-    Square
+    Square,
+    CustomShape
 }
 struct AudioState {
     audio_device:Option<Box<dyn tinyaudio::BaseAudioOutputDevice>>,
@@ -43,7 +44,8 @@ impl AudioState{
             match self.wave_state {
                 WaveState::Silence => {},
                 WaveState::Sine => { value = (clock * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin(); },
-                WaveState::Square => { value = 0.0 } // TODO: placeholder function
+                WaveState::Square => { value = 0.0 }, // TODO: placeholder function
+                WaveState::CustomShape => {}
             }
             
             chan_tuple.0 = value;
