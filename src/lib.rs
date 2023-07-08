@@ -10,47 +10,21 @@ use winit::{
 use web_sys;
 use wasm_bindgen::prelude::*;
 
-#[derive(Debug)]
-struct ShaperNode {
-    clip_pos:[f32;4],
-}
+
 
 pub struct ShaperState {
     render_state:rendering::State,
     sound_engine:audio::SoundEngine,
-    wave:Vec<ShaperNode>,
 }
 impl ShaperState {
     fn new(render_state:rendering::State, sound_engine:audio::SoundEngine) -> ShaperState {
-        let default_wave = vec![
-            ShaperNode{clip_pos:[-1f32, 0f32, 0f32, 1f32]}, // min value for x in clip space
-            ShaperNode{clip_pos:[ 1f32, 0f32, 0f32, 1f32]}, // max value for x in clip space
-        ];
         ShaperState {
             render_state,
             sound_engine,
-            wave:default_wave
         }
     }
 
-    // TODO: add node to the waveshaper
-    fn add_node_to_wave(&mut self, new_node:ShaperNode){
-        match self.wave.len() {
-            0 => {log::warn!("Something is wrong, the wave should not be empty")},
-            _ => {
-                // inserts the new node where it belongs in x-coord increasing order so that wave can be rendered
-                for i in 0..self.wave.len() {
-                    if &new_node.clip_pos[0] < &self.wave[i].clip_pos[0] {
-                        self.wave.insert(i, new_node);
-                        log::warn!("new node added to wave at {:?} wave state is now {:?}", &self.wave[i].clip_pos, &self.wave);
-                        break;
-                    }
-                }
-                // tells the sound engine to change the function that produces samples of our drawn waveform
-            }
-        }
-    }
-
+    // TODO: holy shit this is so nested
     // handles interaction events that affect both the audio and visual states of the wave shaper
     fn handle_shaper_events(&mut self, event:&Event<()>, control_flow:&mut ControlFlow) {
         match event {
@@ -61,7 +35,7 @@ impl ShaperState {
                             MouseButton::Left if state == &ElementState::Pressed => {
                                 let new_node_loc = self.render_state.get_cursor_clip_location();
                                 self.render_state.add_circle_at_clip_location(new_node_loc);
-                                self.add_node_to_wave(ShaperNode { clip_pos:new_node_loc });
+                                self.sound_engine.add_node( ((new_node_loc[0] + 1.0) / 2.0), new_node_loc[1]);
                             },
                             _ => {}
                         }

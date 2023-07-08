@@ -14,20 +14,28 @@ use winit::{
 
 mod audio_utils;
 #[derive(Clone, Copy)]
-enum WaveState{
-    Silence,
-    Sine,
-    Square,
-    CustomShape
+
+#[derive(Debug)]
+struct ShaperNode {
+    wave_pos:f32,
+    amplitude:f32
 }
+
 struct AudioState {
     audio_device:Option<Box<dyn tinyaudio::BaseAudioOutputDevice>>,
-    wave_state: WaveState
+    wave:Vec<ShaperNode>,
 }
 
 impl AudioState{
     pub fn new() -> AudioState {
-        AudioState{ audio_device:None, wave_state: WaveState::Silence }
+        AudioState{ 
+            audio_device:None,
+            wave: vec![
+                // min and max x vals for a wave, both set to zero so that the wave loops cleanly
+                ShaperNode{wave_pos:0f32, amplitude:0f32}, // min value for x in clip space
+                ShaperNode{wave_pos:1f32, amplitude:0f32}, // max value for x in clip space
+            ],
+        }
     }
 
     pub fn render(&mut self, buf: &mut [(f32, f32)], params: tinyaudio::OutputDeviceParameters) {
@@ -35,24 +43,34 @@ impl AudioState{
 
         let mut clock = 0f32;
 
-        // Fill based on sine wave
-        for chan_tuple in buf {
+        // used in the loop to determine the linear interpolation needed
+        let next_inflection_sample = (self.wave[self.wave.len() - 1].wave_pos * buf.len() as f32) as usize;
+        // TODO: Fill audio buffer based on nodes
+        for curr_chan_tuple in 0..buf.len() {
             clock = (clock + 1.0) % params.sample_rate as f32;
 
             let mut value: f32 = 0.0;
             
-            match self.wave_state {
-                WaveState::Silence => {},
-                WaveState::Sine => { value = (clock * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin(); },
-                WaveState::Square => { value = 0.0 }, // TODO: placeholder function
-                WaveState::CustomShape => {}
-            }
+            // keeping this here to show an example of how the sample clock can be used to generate a sine wave
+            // WaveState::Sine => { value = (clock * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin(); },
             
-            chan_tuple.0 = value;
-            chan_tuple.1 = value;
+            // setting the left and right channels
+            buf[curr_chan_tuple].0 = value;
+            buf[curr_chan_tuple].1 = value;
         }
     }
 
+    fn add_node_to_wave(&mut self, wave_pos:f32, amplitude:f32) {
+        // inserts the new node where it belongs in x-coord increasing order so that wave can be rendered
+        for i in 0..self.wave.len() {
+            if wave_pos < self.wave[i].wave_pos {
+                self.wave.insert(i, ShaperNode { wave_pos, amplitude });
+                log::warn!("new node added to wave at {:?} wave state is now {:?}", &self.wave[i].wave_pos, &self.wave);
+                break;
+            }
+        }
+        // tells the sound engine to change the function that produces samples of our drawn waveform
+    }
 }
 
 /// Sound engine manages contexts, feeds output device with data. Sound engine instance can be cloned,
@@ -74,10 +92,7 @@ impl SoundEngine {
     /// The user should periodically run [`State::render`] if they want to implement their own sample sending
     /// method to an output device (or a file, etc.).
     pub fn without_device() -> Self {
-        Self(Arc::new(Mutex::new(AudioState {
-            audio_device:None,
-            wave_state:WaveState::Sine
-        })))
+        Self(Arc::new(Mutex::new(AudioState::new())))
     }
 
     /// Tries to initialize default audio output device.
@@ -124,6 +139,10 @@ impl SoundEngine {
         self.0.lock().unwrap()
     }
 
+    pub fn add_node(&mut self, wave_pos:f32, amplitude:f32){
+        self.state().add_node_to_wave(wave_pos, amplitude);
+    }
+
     pub fn handle_audio_maintenance_events(&mut self, event: &Event<()>, control_flow: &mut ControlFlow){
         match event {
             Event::WindowEvent {event,..} => {
@@ -140,14 +159,6 @@ impl SoundEngine {
                                 self.initialize_audio_output_device();
                             } else {
                                 log::warn!("Hello from state changing");
-                                // This is just a bit of code that would show that I ca change the render function output by clicking, will be removed soon
-                                let curr_state = self.state().wave_state;
-                                self.state().wave_state = match curr_state {
-                                    WaveState::Silence => { WaveState::Sine },
-                                    WaveState::Sine => { WaveState::Silence },
-                                    WaveState::Square => { WaveState::Silence },
-                                    WaveState::CustomShape => { WaveState::Silence },
-                                };
                             }
                         }
                     },
