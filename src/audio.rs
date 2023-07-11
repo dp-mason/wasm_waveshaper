@@ -41,22 +41,39 @@ impl AudioState{
     pub fn render(&mut self, buf: &mut [(f32, f32)], params: tinyaudio::OutputDeviceParameters) {
         buf.fill((0.0, 0.0));
 
-        let mut clock = 0f32;
-
+        
         // used in the loop to determine the linear interpolation needed
-        let next_inflection_sample = (self.wave[self.wave.len() - 1].wave_pos * buf.len() as f32) as usize;
-        // TODO: Fill audio buffer based on nodes
-        for curr_chan_tuple in 0..buf.len() {
-            clock = (clock + 1.0) % params.sample_rate as f32;
+        let mut clock = 0;
+        let mut wave_nodes = self.wave.iter();
+        
+        // TODO: this means that the pitch is determined by the buffer size, should look to change this in a way that still allows smooth looping
+        // quantizes all the 0..1 wave pos values of the nodes to sample positions within the buffer
+        let mut inflection_samples = self.wave.iter().map( |node| (node.wave_pos * (buf.len() as f32)).floor() as usize );
+        let mut start_window = inflection_samples.next();
+        let mut end_window = inflection_samples.next();
+        
+        // Fill audio buffer based on nodes
+        for node_index in 0..self.wave.len() - 1 {
+            let mut window_end = (self.wave[node_index + 1].wave_pos * (buf.len() as f32)).floor() as usize;
 
-            let mut value: f32 = 0.0;
-            
-            // keeping this here to show an example of how the sample clock can be used to generate a sine wave
-            // WaveState::Sine => { value = (clock * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin(); },
-            
-            // setting the left and right channels
-            buf[curr_chan_tuple].0 = value;
-            buf[curr_chan_tuple].1 = value;
+            while clock < window_end {
+                let mut value: f32 = 0.0;
+                
+                // keeping this here to show an example of how the sample clock can be used to generate a sine wave with specific freq
+                // TODO: figure out exactly how this lil snippet generates the sine wave before you design the piecewise linear interpolation stuff
+                //      knowing how this works will lead to a more informed design
+                // WaveState::Sine => { value = (clock * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin(); },
+
+                // TODO: the node_index and node_index+1 will give you the values to interpolate over, replace this line
+                value = (clock as f32 * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin();
+
+                
+                // setting the left and right channels
+                buf[clock].0 = value;
+                buf[clock].1 = value;
+                
+                clock = (clock + 1) % params.sample_rate;
+            }
         }
     }
 
