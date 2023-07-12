@@ -49,12 +49,11 @@ impl AudioState{
         // TODO: this means that the pitch is determined by the buffer size, should look to change this in a way that still allows smooth looping
         // quantizes all the 0..1 wave pos values of the nodes to sample positions within the buffer
         let mut inflection_samples = self.wave.iter().map( |node| (node.wave_pos * (buf.len() as f32)).floor() as usize );
-        let mut start_window = inflection_samples.next();
-        let mut end_window = inflection_samples.next();
         
         // Fill audio buffer based on nodes
         for node_index in 0..self.wave.len() - 1 {
-            let mut window_end = (self.wave[node_index + 1].wave_pos * (buf.len() as f32)).floor() as usize;
+            let mut window_start = (self.wave[node_index    ].wave_pos * (buf.len() as f32)).floor() as usize;
+            let mut window_end   = (self.wave[node_index + 1].wave_pos * (buf.len() as f32)).floor() as usize;
 
             while clock < window_end {
                 let mut value: f32 = 0.0;
@@ -64,9 +63,9 @@ impl AudioState{
                 //      knowing how this works will lead to a more informed design
                 // WaveState::Sine => { value = (clock * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin(); },
 
-                // TODO: the node_index and node_index+1 will give you the values to interpolate over, replace this line
-                value = (clock as f32 * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin();
-
+                // Interpolates the amplitude of samples over a subsection of the wave marked by a start and end node
+                let mut progress = (clock - window_start) as f32 / (window_end - window_start) as f32;
+                value = self.wave[node_index].amplitude * (1.0f32 - progress) + self.wave[node_index + 1].amplitude * progress;
                 
                 // setting the left and right channels
                 buf[clock].0 = value;
