@@ -13,17 +13,51 @@ use winit::{
 };
 
 mod audio_utils;
-#[derive(Clone, Copy)]
 
-#[derive(Debug)]
-struct ShaperNode {
+#[derive(Clone, Copy, Debug)]
+pub struct ShaperNode {
     wave_pos:f32,
     amplitude:f32
 }
 
+// module of functions that generate a wave within a buffer and return the offset of the next buffer
+mod AudioBufGen {
+    pub fn piecewise_linear(buf: &mut [(f32, f32)], wave:&Vec<super::ShaperNode>, wavelen:usize, frame_offset:f32) -> f32{
+        let mut curr_sample = 0;
+        let mut progress = 0.0;
+
+        for node_index in 0..wave.len() - 1 {
+            let mut interval_start = (wave[node_index    ].wave_pos * (buf.len() as f32)).floor() as usize;
+            let mut interval_end   = (wave[node_index + 1].wave_pos * (buf.len() as f32)).floor() as usize;
+
+            while curr_sample < interval_end {
+                let mut value: f32 = 0.0;
+
+                // Interpolates the amplitude of samples over a subsection of the wave marked by a start and end node
+                // the frame offset and fract allow the wave to be generated over time independently of the buffer size
+                progress = (((curr_sample - interval_start) as f32 / (interval_end - interval_start) as f32) + frame_offset).fract();
+                value = wave[node_index].amplitude * (1.0f32 - progress) + wave[node_index + 1].amplitude * progress;
+                
+                // setting the left and right channels
+                buf[curr_sample].0 = value;
+                buf[curr_sample].1 = value;
+                
+                curr_sample = curr_sample + 1;
+            }
+        }
+        // return the progress point of the next sample that fall outside this frame
+        // it will be used as the offset for generating the next frame
+        (progress + (1.0f32 / wavelen as f32)).fract()
+    }
+}
+
+
+
 struct AudioState {
     audio_device:Option<Box<dyn tinyaudio::BaseAudioOutputDevice>>,
     wave:Vec<ShaperNode>,
+    wavelen_samples:usize,
+    frame_buf_offset:f32,
 }
 
 impl AudioState{
@@ -35,45 +69,20 @@ impl AudioState{
                 ShaperNode{wave_pos:0f32, amplitude:0f32}, // min value for x in clip space
                 ShaperNode{wave_pos:1f32, amplitude:0f32}, // max value for x in clip space
             ],
+            wavelen_samples:1024,
+            frame_buf_offset:0f32,
         }
     }
 
     pub fn render(&mut self, buf: &mut [(f32, f32)], params: tinyaudio::OutputDeviceParameters) {
         buf.fill((0.0, 0.0));
-
         
-        // used in the loop to determine the linear interpolation needed
-        let mut clock = 0;
-        let mut wave_nodes = self.wave.iter();
-        
-        // TODO: this means that the pitch is determined by the buffer size, should look to change this in a way that still allows smooth looping
-        // quantizes all the 0..1 wave pos values of the nodes to sample positions within the buffer
-        let mut inflection_samples = self.wave.iter().map( |node| (node.wave_pos * (buf.len() as f32)).floor() as usize );
-        
-        // Fill audio buffer based on nodes
-        for node_index in 0..self.wave.len() - 1 {
-            let mut window_start = (self.wave[node_index    ].wave_pos * (buf.len() as f32)).floor() as usize;
-            let mut window_end   = (self.wave[node_index + 1].wave_pos * (buf.len() as f32)).floor() as usize;
+        // TODO: what is the system by which the user can switch between rendering techniques?
 
-            while clock < window_end {
-                let mut value: f32 = 0.0;
-                
-                // keeping this here to show an example of how the sample clock can be used to generate a sine wave with specific freq
-                // TODO: figure out exactly how this lil snippet generates the sine wave before you design the piecewise linear interpolation stuff
-                //      knowing how this works will lead to a more informed design
-                // WaveState::Sine => { value = (clock * 440.0 * 2.0 * std::f32::consts::PI / params.sample_rate as f32).sin(); },
-
-                // Interpolates the amplitude of samples over a subsection of the wave marked by a start and end node
-                let mut progress = (clock - window_start) as f32 / (window_end - window_start) as f32;
-                value = self.wave[node_index].amplitude * (1.0f32 - progress) + self.wave[node_index + 1].amplitude * progress;
-                
-                // setting the left and right channels
-                buf[clock].0 = value;
-                buf[clock].1 = value;
-                
-                clock = (clock + 1) % params.sample_rate;
-            }
-        }
+        // Fill audio buffer based on nodes in the Shaper Nodes vector
+        // functions in the AudioBufGen module also return the progess point of the sample in the buffer
+        // generated immediately after this one, this can be used as the offset for the next buffer
+        self.frame_buf_offset = AudioBufGen::piecewise_linear(buf, &self.wave, self.wavelen_samples, self.frame_buf_offset);
     }
 
     fn add_node_to_wave(&mut self, wave_pos:f32, amplitude:f32) {
@@ -81,7 +90,7 @@ impl AudioState{
         for i in 0..self.wave.len() {
             if wave_pos < self.wave[i].wave_pos {
                 self.wave.insert(i, ShaperNode { wave_pos, amplitude });
-                log::warn!("new node added to wave at {:?} wave state is now {:?}", &self.wave[i].wave_pos, &self.wave);
+                log::warn!("new node added to wave at {:?}", &self.wave[i].wave_pos);
                 break;
             }
         }
@@ -173,8 +182,8 @@ impl SoundEngine {
                             }
                             if !already_init {
                                 self.initialize_audio_output_device();
+                                log::warn!("Siund engine initialized audio device");
                             } else {
-                                log::warn!("Hello from state changing");
                             }
                         }
                     },

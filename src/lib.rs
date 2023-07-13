@@ -10,7 +10,7 @@ use winit::{
 use web_sys;
 use wasm_bindgen::prelude::*;
 
-
+//TODO: shaper state is basically the UI layer. Why does it "own" instances of AudioState and RenderState?
 
 pub struct ShaperState {
     render_state:rendering::State,
