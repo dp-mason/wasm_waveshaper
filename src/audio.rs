@@ -14,17 +14,76 @@ use winit::{
 
 mod audio_utils;
 
-#[derive(Clone, Copy, Debug)]
-pub struct ShaperNode {
+#[derive(Clone, Debug, PartialEq)]
+pub struct WaveNode {
     wave_pos:f32,
-    amplitude:f32
+    amplitude:f32,
+    next:Option<Box<WaveNode>>,
+}
+
+// cyclical linked list used to generate waves in audio rendering functions
+struct Wave {
+    head: Option<Box<WaveNode>>,
+    len: usize,
+}
+
+impl Wave {
+    // Create an empty linked list
+    fn new() -> Self {
+        Wave { head: None, len:0 }
+    }
+
+    // Check if the linked list is empty
+    fn is_empty(&self) -> bool {
+        self.head.is_none()
+    }
+
+    // Add a node to the wave
+    fn add(&mut self, new_node:WaveNode) {
+        
+        // if empty list, populate the head, else search for place within list where this fits
+        match &self.head {
+            None => {
+                // set the head to the new node
+                self.head = Some(Box::new(new_node));
+            },
+            _ => {
+                let mut curr_wavenode = self.head.as_mut().unwrap();
+                
+                while curr_wavenode.next.is_some() && curr_wavenode.next != self.head && new_node.wave_pos < curr_wavenode.wave_pos  {
+                    curr_wavenode = curr_wavenode.next.as_mut().unwrap(); // this is safe bc the list is cyclic
+                }
+                
+                // insert the new node after the current wavenode and before the next
+                curr_wavenode.next = Some(Box::new(WaveNode {
+                    next:curr_wavenode.next,
+                    ..new_node
+                }));
+                // ensure that wave with more than two nodes is cyclic
+                if curr_wavenode.next.is_none() {
+                    curr_wavenode.next = Some(self.head.unwrap());
+                }
+
+            }
+        }
+
+        self.len = self.len + 1;
+    
+    }
+}
+
+struct WavePlayState {
+    curr_interval:Box<WaveNode>,
+    interval_progress:f32,
 }
 
 // module of functions that generate a wave within a buffer and return the offset of the next buffer
 mod AudioBufGen {
-    pub fn piecewise_linear(buf: &mut [(f32, f32)], wave:&Vec<super::ShaperNode>, freq_mult:f32, wave_progress:f32) -> f32 {    
+    use super::WavePlayState;
+
+
+    pub fn piecewise_linear(buf: &mut [(f32, f32)], play_state:&mut WavePlayState, freq_mult:f32) -> f32 {    
         let mut curr_sample = 0;
-        let mut progress = 0.0;
 
         // TODO: since the wave does not necessarily span the whole buffer anymore, this loop needs refactoring
 
@@ -57,33 +116,24 @@ mod AudioBufGen {
             //  only the first part of the wave, only the last part of the wave, or only the middle, depending on how long
             //  the wavelength is compared to the buffer length (determined by freq multiplier)
 
-            let chunk_start = curr_sample;
-            // the chunk end is dependent on the current progress within the wave
-            let chunk_end = std::cmp::min(buf.len(), ( (1.0 - wave_progress) * (buf.len() as f32 * freq_mult.recip()) ) as usize);
+            // while curr_sample < interval_end {
 
-            for node_index in 0..wave.len() - 1 {
-                let mut interval_start = (wave[node_index    ].wave_pos * (buf.len() as f32) * freq_mult).floor() as usize;
-                let mut interval_end   = (wave[node_index + 1].wave_pos * (buf.len() as f32) * freq_mult).floor() as usize;
+            //     let mut value: f32 = 0.0;
 
-                // while curr_sample < interval_end {
+            //     // Interpolates the amplitude of samples over a subsection of the wave marked by a start and end node
+            //     // the frame offset and fract allow the wave to be generated over time independently of the buffer size
 
-                //     let mut value: f32 = 0.0;
-
-                //     // Interpolates the amplitude of samples over a subsection of the wave marked by a start and end node
-                //     // the frame offset and fract allow the wave to be generated over time independently of the buffer size
-
-                //     // TODO: in this line I am mixing up the ideas of progess through the interval and progress through the wave
-                //     // TODO: this is also fucked because the curr_sample trick worked when there was 1 wave per buffer
-                //     let intrvl_progress = ( (curr_sample - interval_start) as f32 / (interval_end - interval_start) as f32 ).fract();
-                //     value = wave[node_index].amplitude * (1.0f32 - intrvl_progress) + wave[node_index + 1].amplitude * intrvl_progress;
-                    
-                //     // setting the left and right channels
-                //     buf[curr_sample].0 = value;
-                //     buf[curr_sample].1 = value;
-                    
-                //     curr_sample = curr_sample + 1;
-                // }
-            }
+            //     // TODO: in this line I am mixing up the ideas of progess through the interval and progress through the wave
+            //     // TODO: this is also fucked because the curr_sample trick worked when there was 1 wave per buffer
+            //     let intrvl_progress = ( (curr_sample - interval_start) as f32 / (interval_end - interval_start) as f32 ).fract();
+            //     value = wave[node_index].amplitude * (1.0f32 - intrvl_progress) + wave[node_index + 1].amplitude * intrvl_progress;
+                
+            //     // setting the left and right channels
+            //     buf[curr_sample].0 = value;
+            //     buf[curr_sample].1 = value;
+                
+            //     curr_sample = curr_sample + 1;
+            // }
         }
 
         // return the progress point of the next sample that fall outside this frame
@@ -96,22 +146,18 @@ mod AudioBufGen {
 
 struct AudioState {
     audio_device:Option<Box<dyn tinyaudio::BaseAudioOutputDevice>>,
-    wave:Vec<ShaperNode>,
+    wave:Wave,
+    play_state:Option<WavePlayState>,
     freq_mult:f32,
-    frame_buf_offset:f32,
 }
 
 impl AudioState{
     pub fn new() -> AudioState {
         AudioState{ 
             audio_device:None,
-            wave: vec![
-                // min and max x vals for a wave, both set to zero so that the wave loops cleanly
-                ShaperNode{wave_pos:0f32, amplitude:0f32}, // min value for x in clip space
-                ShaperNode{wave_pos:1f32, amplitude:0f32}, // max value for x in clip space
-            ],
+            wave: Wave::new(),
+            play_state:None,
             freq_mult:1.5,
-            frame_buf_offset:0f32,
         }
     }
 
@@ -123,19 +169,7 @@ impl AudioState{
         // Fill audio buffer based on nodes in the Shaper Nodes vector
         // functions in the AudioBufGen module also return the progess point of the sample in the buffer
         // generated immediately after this one, this can be used as the offset for the next buffer
-        self.frame_buf_offset = AudioBufGen::piecewise_linear(buf, &self.wave, self.freq_mult, self.frame_buf_offset);
-    }
-
-    fn add_node_to_wave(&mut self, wave_pos:f32, amplitude:f32) {
-        // inserts the new node where it belongs in x-coord increasing order so that wave can be rendered
-        for i in 0..self.wave.len() {
-            if wave_pos < self.wave[i].wave_pos {
-                self.wave.insert(i, ShaperNode { wave_pos, amplitude });
-                log::warn!("new node added to wave at {:?}", &self.wave[i].wave_pos);
-                break;
-            }
-        }
-        // tells the sound engine to change the function that produces samples of our drawn waveform
+        AudioBufGen::piecewise_linear(buf, &mut self.play_state.as_mut().unwrap(), self.freq_mult);
     }
 }
 
@@ -206,7 +240,7 @@ impl SoundEngine {
     }
 
     pub fn add_node(&mut self, wave_pos:f32, amplitude:f32){
-        self.state().add_node_to_wave(wave_pos, amplitude);
+        self.state().wave.add(WaveNode { wave_pos, amplitude, next:None });
     }
 
     pub fn handle_audio_maintenance_events(&mut self, event: &Event<()>, control_flow: &mut ControlFlow){
