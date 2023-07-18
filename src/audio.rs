@@ -50,20 +50,17 @@ impl Wave {
             _ => {
                 let mut curr_wavenode = self.head.as_mut().unwrap();
                 
-                while curr_wavenode.next.is_some() && curr_wavenode.next != self.head && new_node.wave_pos < curr_wavenode.wave_pos  {
+                while curr_wavenode.next.is_some() && new_node.wave_pos < curr_wavenode.wave_pos  {
                     curr_wavenode = curr_wavenode.next.as_mut().unwrap(); // this is safe bc the list is cyclic
                 }
                 
-                // insert the new node after the current wavenode and before the next
-                curr_wavenode.next = Some(Box::new(WaveNode {
-                    next:curr_wavenode.next,
+                let tmp_next_node = curr_wavenode.next.clone();
+
+                // insert the new node after the current wavenode and before the next, will still work for appending to end
+                curr_wavenode.next = Some(Box::new(WaveNode { 
+                    next: tmp_next_node,
                     ..new_node
                 }));
-                // ensure that wave with more than two nodes is cyclic
-                if curr_wavenode.next.is_none() {
-                    curr_wavenode.next = Some(self.head.unwrap());
-                }
-
             }
         }
 
@@ -72,8 +69,26 @@ impl Wave {
     }
 }
 
+impl std::fmt::Display for Wave {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(ref head) = self.head {
+            let mut current = &**head;
+            loop {
+                write!(f, "NODE: wave pos:{} amplitude:{}\n", current.wave_pos, current.amplitude)?;
+
+                if let Some(ref next) = current.next {
+                    current = &**next;
+                } else {
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 struct WavePlayState {
-    curr_interval:Box<WaveNode>,
+    curr_node:Box<WaveNode>,
     interval_progress:f32,
 }
 
@@ -81,8 +96,32 @@ struct WavePlayState {
 mod AudioBufGen {
     use super::WavePlayState;
 
+    
+}
 
-    pub fn piecewise_linear(buf: &mut [(f32, f32)], play_state:&mut WavePlayState, freq_mult:f32) -> f32 {    
+
+
+struct AudioState {
+    audio_device:Option<Box<dyn tinyaudio::BaseAudioOutputDevice>>,
+    wave:Wave,
+    play_state:Option<WavePlayState>,
+    freq_mult:f32,
+}
+
+impl AudioState{
+    pub fn new() -> AudioState {
+        AudioState{ 
+            audio_device:None,
+            wave: Wave::new(),
+            play_state:None,
+            freq_mult:1.5,
+        }
+    }
+
+    // TODO: move these buffer populating funcs somewhere else for organization eventually
+    //  the problem before was that rust will not allow you to leak private types and I dont
+    //  wanna make fields publicly exposed to change yet. different impl block??
+    fn piecewise_linear(buf: &mut [(f32, f32)], play_state:&mut WavePlayState, freq_mult:&f32) -> f32 {    
         let mut curr_sample = 0;
 
         // TODO: since the wave does not necessarily span the whole buffer anymore, this loop needs refactoring
@@ -140,26 +179,6 @@ mod AudioBufGen {
         // it will be used as the offset for generating the next frame
         6.9f32 // TODO: remove, this is just to shut the linter up
     }
-}
-
-
-
-struct AudioState {
-    audio_device:Option<Box<dyn tinyaudio::BaseAudioOutputDevice>>,
-    wave:Wave,
-    play_state:Option<WavePlayState>,
-    freq_mult:f32,
-}
-
-impl AudioState{
-    pub fn new() -> AudioState {
-        AudioState{ 
-            audio_device:None,
-            wave: Wave::new(),
-            play_state:None,
-            freq_mult:1.5,
-        }
-    }
 
     pub fn render(&mut self, buf: &mut [(f32, f32)], params: tinyaudio::OutputDeviceParameters) {
         buf.fill((0.0, 0.0));
@@ -169,7 +188,7 @@ impl AudioState{
         // Fill audio buffer based on nodes in the Shaper Nodes vector
         // functions in the AudioBufGen module also return the progess point of the sample in the buffer
         // generated immediately after this one, this can be used as the offset for the next buffer
-        AudioBufGen::piecewise_linear(buf, &mut self.play_state.as_mut().unwrap(), self.freq_mult);
+        Self::piecewise_linear(buf, &mut self.play_state.as_mut().unwrap(), &self.freq_mult);
     }
 }
 
