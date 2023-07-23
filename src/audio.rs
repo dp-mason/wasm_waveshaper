@@ -6,6 +6,7 @@ use tinyaudio;
 
 use std::error::Error;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::usize;
 
 use winit::{
     event::*,
@@ -31,7 +32,7 @@ struct Wave {
 impl Wave {
     // Create an empty linked list
     fn new(init_node:WaveNode) -> Self {
-        Wave { node_list:vec![init_node], curr_node_index:0, curr_node:init_node.clone(), interval_progress:0.0f32, freq_mult:1.0 }
+        Wave { node_list:vec![init_node], curr_node_index:0, curr_node:init_node.clone(), interval_progress:0.0f32, freq_mult:2.0 }
     }
 
     // Add a node to the wave
@@ -41,38 +42,54 @@ impl Wave {
         match self.node_list.is_empty() {
             true => self.node_list.push(new_node),
             false => {
-                let mut index:usize = 0;
-                while index < self.node_list.len() && new_node.wave_pos < self.node_list[index].wave_pos {
-                    index += 1
+                let res = self.node_list.binary_search_by(|probe| probe.wave_pos.total_cmp(&new_node.wave_pos));
+                match res {
+                    Ok(index) => {
+                        // binary search was able to find an element at this exact position in the node list, don't add
+                        log::warn!("Error: there is already a node at position: {} not addind node to list", new_node.wave_pos);
+                    },
+                    Err(index) => {
+                        // binary search could not find a node at this wave position, tells us the index of where it 
+                        // would be in the list if it existed, use that to insert the node and preserve sort by wave pos
+                        self.node_list.insert(index, new_node);
+                        log::warn!("node added at index: {}", index);
+                    }
                 }
-                self.node_list.insert(index, new_node);
-                // todo: binary search so inseartion is a lil faster self.node_list.binary_search(
             }
         }
-
     }
 
     fn peek_next_node(&self) -> &WaveNode{
-        &self.node_list[self.curr_node_index + 1 % self.node_list.len()]
+        &self.node_list[(self.curr_node_index + 1) % self.node_list.len()]
     }
 
     fn incr_curr_node(&mut self) {
-        self.curr_node_index += 1 % self.node_list.len();
+        self.curr_node_index = (self.curr_node_index + 1) % self.node_list.len();
         self.curr_node = self.node_list[self.curr_node_index];
     }
 
-    fn interval_len_in_samples(&self, start_node:&WaveNode, end_node:&WaveNode, bufsize:usize) -> usize{
+    fn interval_len_in_samples(&self, start_node:&WaveNode, end_node:&WaveNode, bufsize:usize) -> f32{
+        let sample_len_of_wave = (bufsize as f32 / self.freq_mult);
+
         // get length of interval relative to the entire wave ( will be a fraction )
-        let interval_rel_len = match end_node.wave_pos < start_node.wave_pos {
-            true => self.peek_next_node().wave_pos + 1.0 - start_node.wave_pos,
-            false => self.peek_next_node().wave_pos - start_node.wave_pos
+        let interval_rel_len = match end_node.wave_pos <= start_node.wave_pos {
+            true => (end_node.wave_pos + 1.0) - start_node.wave_pos,
+            false => end_node.wave_pos - start_node.wave_pos
         };
 
         // apply the freq multiplier to determine the number of samples in this interval
-        ((interval_rel_len * self.freq_mult.recip()) * bufsize as f32) as usize // recip, because increasing the freq should shorten the wave
+        (interval_rel_len * sample_len_of_wave) // recip, because increasing the freq should shorten the wave
     }
 
-    fn piecewise_linear(&mut self, buf: &mut [(f32, f32)]) -> f32 {    
+    fn interval_samples_remaining(intvl_sample_len:f32, curr_progress:f32) -> usize{
+        ((1.0f32 - curr_progress) * intvl_sample_len) as usize
+    }
+
+    fn piecewise_linear(&mut self, buf: &mut [(f32, f32)]) -> f32 {
+
+        if self.node_list.len() < 2 {
+            return 0.0
+        }  
         
         // TODO: since the wave does not necessarily span the whole buffer anymore, this loop needs refactoring
         
@@ -95,26 +112,36 @@ impl Wave {
         //         curr_sample = curr_sample + 1;
         //     }
         // }
-        
+        //log::warn!("piecewise linear(): filling buf");
+
         let mut curr_sample: usize = 0;
 
         while curr_sample < buf.len() {
             // calculate the end index of this interval based on the play head and progress
             let interval_len_samples = Self::interval_len_in_samples(&self, &self.curr_node, self.peek_next_node(), buf.len());
-            let progress_incr = 1.0 / interval_len_samples as f32;
+            let intvl_samples_remain = Self::interval_samples_remaining(interval_len_samples, self.interval_progress);
+            let end_sample = curr_sample + intvl_samples_remain;
+            let progress_incr = 1.0 / interval_len_samples;
+
+            //log::warn!("interval len: {interval_len_samples}\nrem_sample: {end_sample}\ncurr_sample: {curr_sample} \nprogress:{:?}", self.interval_progress);
             // do a while loop between the start and end points of this interval
-            while curr_sample < buf.len() && self.interval_progress <= 1.0 {
+            while curr_sample < buf.len() && curr_sample < end_sample {
                 // calculate value of this index into the buffer
                 let value = self.curr_node.amplitude * (1.0 - self.interval_progress) + self.peek_next_node().amplitude * self.interval_progress;
                 buf[curr_sample].0 = value;
                 buf[curr_sample].1 = value;
 
+                // if curr_sample == end_sample - 1 {
+                //     log::warn!("value at end of interval is: {value}\n progress is {:?}", self.interval_progress);
+                // }
+
                 self.interval_progress += progress_incr;
                 curr_sample += 1;
             }
 
-            if self.interval_progress >= 1.0 {
-                self.incr_curr_node()
+            if curr_sample < buf.len() {
+                self.incr_curr_node();
+                self.interval_progress = 0.0;
             }
         }
         
@@ -171,9 +198,7 @@ impl AudioState{
         // generated immediately after this one, this can be used as the offset for the next buffer
         // Self::piecewise_linear(buf, &mut self.play_state.as_mut().unwrap(), &self.freq_mult);
 
-        if self.wave.is_some() {
-            self.wave.as_mut().unwrap().piecewise_linear(buf);
-        }
+        self.wave.as_mut().unwrap().piecewise_linear(buf);
     }
 }
 
@@ -257,6 +282,10 @@ impl SoundEngine {
             }
         }
         
+    }
+
+    pub fn print_node_list(&self) {
+        log::warn!("state of audio node list is now: {:?}", self.state().wave.as_ref().unwrap().node_list)
     }
 
     pub fn handle_audio_maintenance_events(&mut self, event: &Event<()>, control_flow: &mut ControlFlow){

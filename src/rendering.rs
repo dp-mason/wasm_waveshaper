@@ -578,7 +578,7 @@ impl State {
             // Winit prevents sizing with CSS, so we have to set
             // the size manually when on web.
             use winit::dpi::PhysicalSize;
-            window.set_inner_size(PhysicalSize::new(800, 250));
+            window.set_inner_size(PhysicalSize::new(800, 800));
     
             use winit::platform::web::WindowExtWebSys;
     
