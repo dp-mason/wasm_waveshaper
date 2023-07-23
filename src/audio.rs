@@ -14,171 +14,152 @@ use winit::{
 
 mod audio_utils;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct WaveNode {
     wave_pos:f32,
     amplitude:f32,
-    next:Option<Box<WaveNode>>,
 }
 
-// cyclical linked list used to generate waves in audio rendering functions
 struct Wave {
-    head: Option<Box<WaveNode>>,
-    len: usize,
+    node_list:Vec<WaveNode>,
+    curr_node_index:usize,
+    curr_node:WaveNode,
+    interval_progress:f32,
+    freq_mult:f32,
 }
 
 impl Wave {
     // Create an empty linked list
-    fn new() -> Self {
-        Wave { head: None, len:0 }
-    }
-
-    // Check if the linked list is empty
-    fn is_empty(&self) -> bool {
-        self.head.is_none()
+    fn new(init_node:WaveNode) -> Self {
+        Wave { node_list:vec![init_node], curr_node_index:0, curr_node:init_node.clone(), interval_progress:0.0f32, freq_mult:1.0 }
     }
 
     // Add a node to the wave
-    fn add(&mut self, new_node:WaveNode) {
+    fn insert_node(&mut self, new_node:WaveNode) {
         
         // if empty list, populate the head, else search for place within list where this fits
-        match &self.head {
-            None => {
-                // set the head to the new node
-                self.head = Some(Box::new(new_node));
-            },
-            _ => {
-                let mut curr_wavenode = self.head.as_mut().unwrap();
-                
-                while curr_wavenode.next.is_some() && new_node.wave_pos < curr_wavenode.wave_pos  {
-                    curr_wavenode = curr_wavenode.next.as_mut().unwrap(); // this is safe bc the list is cyclic
+        match self.node_list.is_empty() {
+            true => self.node_list.push(new_node),
+            false => {
+                let mut index:usize = 0;
+                while index < self.node_list.len() && new_node.wave_pos < self.node_list[index].wave_pos {
+                    index += 1
                 }
-                
-                let tmp_next_node = curr_wavenode.next.clone();
-
-                // insert the new node after the current wavenode and before the next, will still work for appending to end
-                curr_wavenode.next = Some(Box::new(WaveNode { 
-                    next: tmp_next_node,
-                    ..new_node
-                }));
+                self.node_list.insert(index, new_node);
+                // todo: binary search so inseartion is a lil faster self.node_list.binary_search(
             }
         }
 
-        self.len = self.len + 1;
-    
+    }
+
+    fn peek_next_node(&self) -> &WaveNode{
+        &self.node_list[self.curr_node_index + 1 % self.node_list.len()]
+    }
+
+    fn incr_curr_node(&mut self) {
+        self.curr_node_index += 1 % self.node_list.len();
+        self.curr_node = self.node_list[self.curr_node_index];
+    }
+
+    fn interval_len_in_samples(&self, start_node:&WaveNode, end_node:&WaveNode, bufsize:usize) -> usize{
+        // get length of interval relative to the entire wave ( will be a fraction )
+        let interval_rel_len = match end_node.wave_pos < start_node.wave_pos {
+            true => self.peek_next_node().wave_pos + 1.0 - start_node.wave_pos,
+            false => self.peek_next_node().wave_pos - start_node.wave_pos
+        };
+
+        // apply the freq multiplier to determine the number of samples in this interval
+        ((interval_rel_len * self.freq_mult.recip()) * bufsize as f32) as usize // recip, because increasing the freq should shorten the wave
+    }
+
+    fn piecewise_linear(&mut self, buf: &mut [(f32, f32)]) -> f32 {    
+        
+        // TODO: since the wave does not necessarily span the whole buffer anymore, this loop needs refactoring
+        
+        // for node_index in 0..wave.len() - 1 {
+            //     let mut interval_start = (wave[node_index    ].wave_pos * (buf.len() as f32)).floor() as usize;
+            //     let mut interval_end   = (wave[node_index + 1].wave_pos * (buf.len() as f32)).floor() as usize;
+            
+            //     while curr_sample < interval_end {
+                //         let mut value: f32 = 0.0;
+                
+                //         // Interpolates the amplitude of samples over a subsection of the wave marked by a start and end node
+                //         // the frame offset and fract allow the wave to be generated over time independently of the buffer size
+                //         progress = (((curr_sample - interval_start) as f32 / (interval_end - interval_start) as f32) * freq_mult + frame_offset).fract();
+        //         value = wave[node_index].amplitude * (1.0f32 - progress) + wave[node_index + 1].amplitude * progress;
+                
+        //         // setting the left and right channels
+        //         buf[curr_sample].0 = value;
+        //         buf[curr_sample].1 = value;
+        
+        //         curr_sample = curr_sample + 1;
+        //     }
+        // }
+        
+        let mut curr_sample: usize = 0;
+
+        while curr_sample < buf.len() {
+            // calculate the end index of this interval based on the play head and progress
+            let interval_len_samples = Self::interval_len_in_samples(&self, &self.curr_node, self.peek_next_node(), buf.len());
+            let progress_incr = 1.0 / interval_len_samples as f32;
+            // do a while loop between the start and end points of this interval
+            while curr_sample < buf.len() && self.interval_progress <= 1.0 {
+                // calculate value of this index into the buffer
+                let value = self.curr_node.amplitude * (1.0 - self.interval_progress) + self.peek_next_node().amplitude * self.interval_progress;
+                buf[curr_sample].0 = value;
+                buf[curr_sample].1 = value;
+
+                self.interval_progress += progress_incr;
+                curr_sample += 1;
+            }
+
+            if self.interval_progress >= 1.0 {
+                self.incr_curr_node()
+            }
+        }
+        
+        // return the progress point of the next sample that fall outside this frame
+        // it will be used as the offset for generating the next frame
+        self.interval_progress // TODO: remove, this is just to shut the linter up
     }
 }
 
 impl std::fmt::Display for Wave {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(ref head) = self.head {
-            let mut current = &**head;
-            loop {
-                write!(f, "NODE: wave pos:{} amplitude:{}\n", current.wave_pos, current.amplitude)?;
+        // if let Some(ref head) = self.head {
+        //     write!(f, "Printing wave with nodes:")?;
+        //     let mut current = &**head;
+        //     loop {
+        //         write!(f, "     NODE: wave pos:{} amplitude:{}\n", current.wave_pos, current.amplitude)?;
 
-                if let Some(ref next) = current.next {
-                    current = &**next;
-                } else {
-                    break;
-                }
-            }
-        }
+        //         if let Some(ref next) = current.next {
+        //             current = &**next;
+        //         } else {
+        //             break;
+        //         }
+        //     }
+        // }
+        // TODO: implement
         Ok(())
     }
-}
-
-struct WavePlayState {
-    curr_node:Box<WaveNode>,
-    interval_progress:f32,
-}
-
-// module of functions that generate a wave within a buffer and return the offset of the next buffer
-mod AudioBufGen {
-    use super::WavePlayState;
-
-    
 }
 
 
 
 struct AudioState {
     audio_device:Option<Box<dyn tinyaudio::BaseAudioOutputDevice>>,
-    wave:Wave,
-    play_state:Option<WavePlayState>,
-    freq_mult:f32,
+    wave:Option<Wave>,
 }
 
 impl AudioState{
     pub fn new() -> AudioState {
         AudioState{ 
-            audio_device:None,
-            wave: Wave::new(),
-            play_state:None,
-            freq_mult:1.5,
+            audio_device: None,
+            wave: None,
         }
     }
 
-    // TODO: move these buffer populating funcs somewhere else for organization eventually
-    //  the problem before was that rust will not allow you to leak private types and I dont
-    //  wanna make fields publicly exposed to change yet. different impl block??
-    fn piecewise_linear(buf: &mut [(f32, f32)], play_state:&mut WavePlayState, freq_mult:&f32) -> f32 {    
-        let mut curr_sample = 0;
-
-        // TODO: since the wave does not necessarily span the whole buffer anymore, this loop needs refactoring
-
-        // for node_index in 0..wave.len() - 1 {
-        //     let mut interval_start = (wave[node_index    ].wave_pos * (buf.len() as f32)).floor() as usize;
-        //     let mut interval_end   = (wave[node_index + 1].wave_pos * (buf.len() as f32)).floor() as usize;
-
-        //     while curr_sample < interval_end {
-        //         let mut value: f32 = 0.0;
-
-        //         // Interpolates the amplitude of samples over a subsection of the wave marked by a start and end node
-        //         // the frame offset and fract allow the wave to be generated over time independently of the buffer size
-        //         progress = (((curr_sample - interval_start) as f32 / (interval_end - interval_start) as f32) * freq_mult + frame_offset).fract();
-        //         value = wave[node_index].amplitude * (1.0f32 - progress) + wave[node_index + 1].amplitude * progress;
-                
-        //         // setting the left and right channels
-        //         buf[curr_sample].0 = value;
-        //         buf[curr_sample].1 = value;
-                
-        //         curr_sample = curr_sample + 1;
-        //     }
-        // }
-        
-        // TODO: I would really like a system where I dont have to do a lookup within the wave node buffer for every sample
-        // need time to consider how to design this
-
-        while curr_sample < buf.len() {
-            // the wave is generated independently of the size of the buffer
-            // for this reason we need to divide the buffer into "chunks" that may contain the enitery of the wave
-            //  only the first part of the wave, only the last part of the wave, or only the middle, depending on how long
-            //  the wavelength is compared to the buffer length (determined by freq multiplier)
-
-            // while curr_sample < interval_end {
-
-            //     let mut value: f32 = 0.0;
-
-            //     // Interpolates the amplitude of samples over a subsection of the wave marked by a start and end node
-            //     // the frame offset and fract allow the wave to be generated over time independently of the buffer size
-
-            //     // TODO: in this line I am mixing up the ideas of progess through the interval and progress through the wave
-            //     // TODO: this is also fucked because the curr_sample trick worked when there was 1 wave per buffer
-            //     let intrvl_progress = ( (curr_sample - interval_start) as f32 / (interval_end - interval_start) as f32 ).fract();
-            //     value = wave[node_index].amplitude * (1.0f32 - intrvl_progress) + wave[node_index + 1].amplitude * intrvl_progress;
-                
-            //     // setting the left and right channels
-            //     buf[curr_sample].0 = value;
-            //     buf[curr_sample].1 = value;
-                
-            //     curr_sample = curr_sample + 1;
-            // }
-        }
-
-        // return the progress point of the next sample that fall outside this frame
-        // it will be used as the offset for generating the next frame
-        6.9f32 // TODO: remove, this is just to shut the linter up
-    }
+    
 
     pub fn render(&mut self, buf: &mut [(f32, f32)], params: tinyaudio::OutputDeviceParameters) {
         buf.fill((0.0, 0.0));
@@ -188,7 +169,11 @@ impl AudioState{
         // Fill audio buffer based on nodes in the Shaper Nodes vector
         // functions in the AudioBufGen module also return the progess point of the sample in the buffer
         // generated immediately after this one, this can be used as the offset for the next buffer
-        Self::piecewise_linear(buf, &mut self.play_state.as_mut().unwrap(), &self.freq_mult);
+        // Self::piecewise_linear(buf, &mut self.play_state.as_mut().unwrap(), &self.freq_mult);
+
+        if self.wave.is_some() {
+            self.wave.as_mut().unwrap().piecewise_linear(buf);
+        }
     }
 }
 
@@ -259,7 +244,19 @@ impl SoundEngine {
     }
 
     pub fn add_node(&mut self, wave_pos:f32, amplitude:f32){
-        self.state().wave.add(WaveNode { wave_pos, amplitude, next:None });
+        let mut wave_initialized = match self.state().wave {
+            None => false,
+            Some(_) => true
+        };
+        match wave_initialized {
+            true => {
+                self.state().wave.as_mut().unwrap().insert_node(WaveNode { wave_pos, amplitude });
+            },
+            false => {
+                self.state().wave = Some(Wave::new(WaveNode { wave_pos, amplitude }));
+            }
+        }
+        
     }
 
     pub fn handle_audio_maintenance_events(&mut self, event: &Event<()>, control_flow: &mut ControlFlow){
@@ -276,7 +273,7 @@ impl SoundEngine {
                             }
                             if !already_init {
                                 self.initialize_audio_output_device();
-                                log::warn!("Siund engine initialized audio device");
+                                log::warn!("Sound engine initialized audio device");
                             } else {
                             }
                         }
