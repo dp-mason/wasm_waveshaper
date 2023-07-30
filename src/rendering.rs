@@ -29,7 +29,7 @@ struct GraphicsInput {
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct CircleInstance {
     position:[f32;3],
-    //right_nbr_pos:[f32;3],
+    right_nbr_pos:[f32;3],
     scale:f32,
 }
 impl CircleInstance {
@@ -48,14 +48,14 @@ impl CircleInstance {
                     shader_location:2,
                     format:wgpu::VertexFormat::Float32x3,
                 },
-                // wgpu::VertexAttribute{
-                //     offset:std::mem::size_of::<[f32; 3]>()       as wgpu::BufferAddress,
-                //     shader_location:3,
-                //     format:wgpu::VertexFormat::Float32x3,
-                // },
                 wgpu::VertexAttribute{
-                    offset:(std::mem::size_of::<[f32; 3]>()) as wgpu::BufferAddress,
+                    offset:std::mem::size_of::<[f32; 3]>()       as wgpu::BufferAddress,
                     shader_location:3,
+                    format:wgpu::VertexFormat::Float32x3,
+                },
+                wgpu::VertexAttribute{
+                    offset:(std::mem::size_of::<[f32; 3]>() * 2) as wgpu::BufferAddress,
+                    shader_location:4,
                     format:wgpu::VertexFormat::Float32,
                 }
             ]
@@ -239,7 +239,7 @@ impl State {
             CircleInstance {
                 position:[0.0, 0.0, 0.0],
                 scale:1.0,
-                //right_nbr_pos:[1.0, 0.0, 0.0],
+                right_nbr_pos:[1.0, 0.0, 0.0],
             },
         ];
         let circle_instances_buffer = device.create_buffer_init(
@@ -424,7 +424,7 @@ impl State {
     pub fn add_circle_instance(&mut self, world_position:[f32;3], scale:f32) {
         self.circle_instances.push(CircleInstance {
             position:world_position,
-            //right_nbr_pos:[1.0, 0.0, 0.0], //TODO: placeholder negibor pos
+            right_nbr_pos:[1.0, 0.0, 0.0], //TODO: placeholder negibor pos
             scale:scale,
         });
         

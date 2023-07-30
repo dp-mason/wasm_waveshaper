@@ -28,8 +28,8 @@ fn vert_main(
     @location(0) world_position:vec3<f32>, 
     @location(1) color:vec3<f32>,
     @location(2) instance_pos:vec2<f32>,
-    // @location(3) right_nbr_pos:vec2<f32>,
-    @location(3) instance_scale:f32,
+    @location(3) right_nbr_pos:vec3<f32>,
+    @location(4) instance_scale:f32,
 ) -> VertexOutput {
     var return_data:VertexOutput;
     // write some data to the vertex's position attribute, THIS VALUE WILL BE CHANGED INBETWEEN THE VERT AND FRAG SHADERS
