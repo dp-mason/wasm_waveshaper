@@ -29,10 +29,12 @@ struct GraphicsInput {
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct CircleInstance {
     position:[f32;3],
-    scale:f32
+    //right_nbr_pos:[f32;3],
+    scale:f32,
 }
 impl CircleInstance {
     // returns a vertex buffer layout used for storing this data type in a Vertex Buffer
+    // TODO: I think my issue has gotta be origniating here... Idk how tho, look up how vertexbufferlayout works again
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout{
             array_stride: std::mem::size_of::<CircleInstance>() as wgpu::BufferAddress,
@@ -46,8 +48,13 @@ impl CircleInstance {
                     shader_location:2,
                     format:wgpu::VertexFormat::Float32x3,
                 },
+                // wgpu::VertexAttribute{
+                //     offset:std::mem::size_of::<[f32; 3]>()       as wgpu::BufferAddress,
+                //     shader_location:3,
+                //     format:wgpu::VertexFormat::Float32x3,
+                // },
                 wgpu::VertexAttribute{
-                    offset:std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    offset:(std::mem::size_of::<[f32; 3]>()) as wgpu::BufferAddress,
                     shader_location:3,
                     format:wgpu::VertexFormat::Float32,
                 }
@@ -61,6 +68,7 @@ impl CircleInstance {
 // to accomodate this setup in the render pipeline config settings, the topology is set to "strip"
 const VERTICES:&[Vertex] = &[
     // background filling triangles
+    // also used for rendering the areas between the points and the baseline
     Vertex{position: [ 1.0,  1.0, 1.0], color: [1.0, 0.0, 0.0]}, // top right
     Vertex{position: [-1.0,  1.0, 1.0], color: [0.0, 0.0, 0.0]}, // top left
     Vertex{position: [ 1.0, -1.0, 1.0], color: [1.0, 1.0, 0.0]}, // bottom right
@@ -227,14 +235,12 @@ impl State {
         });
         let num_tri_indices = TRI_INDEX_BUFFER.len() as u32;
 
-        let circle_instances = [
+        let circle_instances: [CircleInstance; 1] = [
             CircleInstance {
                 position:[0.0, 0.0, 0.0],
                 scale:1.0,
+                //right_nbr_pos:[1.0, 0.0, 0.0],
             },
-            // CircleInstance {
-            //     position:[0.0, 1.0]
-            // }
         ];
         let circle_instances_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -418,6 +424,7 @@ impl State {
     pub fn add_circle_instance(&mut self, world_position:[f32;3], scale:f32) {
         self.circle_instances.push(CircleInstance {
             position:world_position,
+            //right_nbr_pos:[1.0, 0.0, 0.0], //TODO: placeholder negibor pos
             scale:scale,
         });
         

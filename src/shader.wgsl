@@ -2,7 +2,9 @@
 //      in the context of the fragment shader "@builtin(position)" refers to the framebuffer position of fragment
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) color:vec3<f32> // TODO: are we overwriting the vert buffer (position part that is at loc 0) ??
+    @location(0) color:vec3<f32>, // TODO: are we overwriting the vert buffer (position part that is at loc 0) ??
+    @location(1) left_nbr_pos:vec2<f32>,
+    @location(2) right_nbr_pos:vec2<f32>
 };
 
 // !!! WGSL INTERPRETS MATRICES AS SETS OF COLUMN VECTORS !!!
@@ -26,6 +28,7 @@ fn vert_main(
     @location(0) world_position:vec3<f32>, 
     @location(1) color:vec3<f32>,
     @location(2) instance_pos:vec2<f32>,
+    // @location(3) right_nbr_pos:vec2<f32>,
     @location(3) instance_scale:f32,
 ) -> VertexOutput {
     var return_data:VertexOutput;
@@ -66,6 +69,9 @@ fn frag_main(
             return vec4<f32>(1.0, 0.0, 0.0, 1.0); 
         }
     }
+
+    // calculate if this fragment falls between the wave line and baseline at zero
+
 
     return vec4<f32>(vert_data.color, 1.0); // print the vertex color
 }
