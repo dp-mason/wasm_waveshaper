@@ -161,12 +161,15 @@ impl State {
         let size = window.inner_size();
 
         // creates (handle?) to the GPU, Backends refers to Vulkan, DXD12, Metal and (BrowserWebGPU?)
-        let instance = wgpu::Instance::new(wgpu::Backends::all());
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor{
+            backends:wgpu::Backends::all(),
+            dx12_shader_compiler:wgpu::Dx12Compiler::Dxc { dxil_path: None, dxc_path: None }
+        });
 
         // Apparently this should be safe, because "State" owns the window
         // this ensures that the State will live as long as the window?
         // "surface" is the section of the window we draw to
-        let surface = unsafe { instance.create_surface(&window) };
+        let surface = unsafe { instance.create_surface(&window).unwrap() };
 
         // "adapter" houses the info about our GPU
         // if you have multiple graphics cards you will be able to interate over returned adapters
@@ -201,7 +204,8 @@ impl State {
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface.get_supported_formats(&adapter)[0],
+            format: surface.get_capabilities(&adapter).formats[0],
+            view_formats: vec![surface.get_capabilities(&adapter).formats[0]],
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Fifo,
@@ -238,7 +242,7 @@ impl State {
         let circle_instances: [CircleInstance; 1] = [
             CircleInstance {
                 position:[0.0, 0.0, 0.0],
-                scale:1.0,
+                scale:0.0, //TODO: bruh this is a hack, figure this shit out
                 right_nbr_pos:[1.0, 0.0, 0.0],
             },
         ];
@@ -498,13 +502,13 @@ impl State {
             Some(index) => {
                 log::warn!("Clicked circle at index: {index}");
                 match self.expand_circle(index) {
-                    Err(msg) => log::error!("EXPAND CIRCLE ERR: {msg}"),
+                    Err(msg) => log::error!("ADD CIRCLE AT CLIP LOC ERR: {msg}"),
                     _ => {},
                 }
             },
             None => {
                 log::warn!("new circle created at world location: {:?}", world_loc);
-                self.add_circle_instance([world_loc[0], world_loc[1], world_loc[2]], 0.2);
+                self.add_circle_instance([world_loc[0], world_loc[1], world_loc[2]], 2.000000);
             }
         }
     }

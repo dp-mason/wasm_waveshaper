@@ -3,8 +3,7 @@
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) color:vec3<f32>, // TODO: are we overwriting the vert buffer (position part that is at loc 0) ??
-    @location(1) left_nbr_pos:vec2<f32>,
-    @location(2) right_nbr_pos:vec2<f32>
+    @location(1) right_nbr_pos:vec2<f32>,
 };
 
 // !!! WGSL INTERPRETS MATRICES AS SETS OF COLUMN VECTORS !!!
@@ -44,8 +43,10 @@ fn vert_main(
         
         // todo: highlight this circle if the cursor is hovering over it
         return_data.color = vec3(0.0, 1.0, 0.0);
-
     }
+
+    return_data.right_nbr_pos = vec2(right_nbr_pos[0], right_nbr_pos[1]);
+    
     return return_data;
 }
 
@@ -70,7 +71,13 @@ fn frag_main(
         }
     }
 
+    // TODO: nothing is getting lit up white so I assume this is a coord system issue, earlier everything
+    // was li8t up white when I only used the the first conditional, which is not what I was expecting to 
+    // happen
     // calculate if this fragment falls between the wave line and baseline at zero
+    if vert_data.position[1] > 0.00 && vert_data.position[1] < abs(vert_data.right_nbr_pos[1]) {
+        return vec4<f32>(1.0, 1.0, 1.0, 1.0); // show the shape of the wave in white
+    } 
 
 
     return vec4<f32>(vert_data.color, 1.0); // print the vertex color
