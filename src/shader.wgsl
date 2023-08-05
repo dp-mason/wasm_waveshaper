@@ -42,7 +42,7 @@ fn vert_main(
         return_data.position = graphics_input.world_to_clip_transfm * vec4(world_position * instance_scale + vec3(instance_pos, 0.0), 1.0);
         
         // todo: highlight this circle if the cursor is hovering over it
-        return_data.color = vec3(0.0, 1.0, 0.0);
+        return_data.color = vec3(0.0, world_position[1] * instance_scale + instance_pos[1], 0.0);
     }
 
     return_data.right_nbr_pos = vec2(right_nbr_pos[0], right_nbr_pos[1]);
@@ -72,13 +72,14 @@ fn frag_main(
     }
 
     // TODO: nothing is getting lit up white so I assume this is a coord system issue, earlier everything
-    // was li8t up white when I only used the the first conditional, which is not what I was expecting to 
+    // was lit up white when I only used the the first conditional, which is not what I was expecting to 
     // happen
     // calculate if this fragment falls between the wave line and baseline at zero
-    if vert_data.position[1] > 0.00 && vert_data.position[1] < abs(vert_data.right_nbr_pos[1]) {
+    if vert_data.color[1] < abs(vert_data.right_nbr_pos[1]) {
         return vec4<f32>(1.0, 1.0, 1.0, 1.0); // show the shape of the wave in white
-    } 
+    }
 
+    return vec4<f32>(vert_data.color, 1.0); // print the vertex pos
 
-    return vec4<f32>(vert_data.color, 1.0); // print the vertex color
+    //return vec4<f32>(0.0, 0.0, 1.0, 1.0);
 }

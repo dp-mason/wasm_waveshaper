@@ -242,8 +242,8 @@ impl State {
         let circle_instances: [CircleInstance; 1] = [
             CircleInstance {
                 position:[0.0, 0.0, 0.0],
-                scale:0.0, //TODO: bruh this is a hack, figure this shit out
-                right_nbr_pos:[1.0, 0.0, 0.0],
+                scale:1.0, //TODO: bruh this is a hack, figure this shit out
+                right_nbr_pos:[10.0, 0.0, 0.0], // TODO: 10 is a migic num and this is a placeholder nyways
             },
         ];
         let circle_instances_buffer = device.create_buffer_init(
