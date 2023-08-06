@@ -438,7 +438,7 @@ impl State {
                 self.circle_instances.push(new_circle);
             },
             false => {
-                
+                // search for where this circle fits in this list of circles ordered by x axis position
                 let res = self.circle_instances.binary_search_by(|probe| probe.position[0].total_cmp(&new_circle.position[0]));
                 match res {
                     Ok(index) => {
@@ -449,8 +449,12 @@ impl State {
                         // binary search could not find a node at this wave position, tells us the index of where it 
                         // would be in the list if it existed, use that to insert the node and preserve sort by wave pos
                         self.circle_instances.insert(index, new_circle);
-                        // TODO: update the right neighbor if not at the end of the list
-                        // TODO: update the right neighbor of this new nodes left neighbor if not at beginning of list 
+                        // update the right neighbor
+                        self.circle_instances[index].right_nbr_pos = self.circle_instances[(index + 1) % self.circle_instances.len()].position;
+                        // update the right neighbor of this new nodes left neighbor
+                        // extra logic allows end of list to have right neighbor at begining of list
+                        let num_circs = self.circle_instances.len(); // need this bc we cant borrow within borrow on next line
+                        self.circle_instances[(index + num_circs - 1) % num_circs].right_nbr_pos = self.circle_instances[index].position;
                         log::warn!("node added at index: {}", index);
                     }
                 }
