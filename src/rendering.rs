@@ -239,12 +239,12 @@ impl State {
         });
         let num_tri_indices = TRI_INDEX_BUFFER.len() as u32;
 
-        let circle_instances: [CircleInstance; 1] = [
-            CircleInstance {
-                position:[0.0, 0.0, 0.0],
-                scale:1.0, //TODO: bruh this is a hack, figure this shit out
-                right_nbr_pos:[10.0, 0.0, 0.0], // TODO: 10 is a migic num and this is a placeholder nyways
-            },
+        let circle_instances: [CircleInstance; 0] = [
+            // CircleInstance {
+            //     position:[0.0, 0.0, 0.0],
+            //     scale:1.0, //TODO: bruh this is a hack, figure this shit out
+            //     right_nbr_pos:[10.0, 0.0, 0.0], // TODO: 10 is a migic num and this is a placeholder nyways
+            // },
         ];
         let circle_instances_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -686,10 +686,13 @@ impl State {
 
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
-            // draw something with 4 vertices, and 1 instance. This is where @builtin(vertex_index) comes from in the vert shader wgsl code
-            // TODO: use "draw_indexed()" instead if you want to draw
-            render_pass.draw_indexed(0..6, 0, 0..1); // draw background, remember range is not max inclusive
-            render_pass.draw_indexed(6..self.num_tri_indices, 0, 0..self.circle_instances.len() as u32); // draw circles
+            // draw something with 4 vertices, and 1 instance. This is where @builtin(vertex_index) comes from in the vert shader wgsl code TODO: comment doesn't make sense
+            if self.circle_instances.len() > 0 {
+                // TODO: these should prob be on separate (render passes?), shaders, etc. Like... the draw command for the background plane
+                // probably should have no concept of the circle instances: different vert bufs, etc. It's a bit of a tricky thing to go back and untangle
+                render_pass.draw_indexed(0..6, 0, 0..1); // draw background, remember range is not max inclusive
+                render_pass.draw_indexed(6..self.num_tri_indices, 0, 0..self.circle_instances.len() as u32); // draw circles
+            }
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
