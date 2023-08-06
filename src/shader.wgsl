@@ -5,6 +5,7 @@ struct VertexOutput {
     @location(0) color:vec3<f32>, // TODO: are we overwriting the vert buffer (position part that is at loc 0) ??
     @location(2) slope_intercept:vec2<f32>,
     @location(3) world_pos:vec2<f32>,
+    @location(4) is_bg:u32,
 };
 
 // !!! WGSL INTERPRETS MATRICES AS SETS OF COLUMN VECTORS !!!
@@ -38,6 +39,8 @@ fn vert_main(
         return_data.position = vec4<f32>(world_position, 1.0); // dont transform to clip space, the background coords are actually already in clip space
         return_data.color = vec3<f32>(color[0], color[1], 0.0);
 
+        return_data.is_bg = 1u;
+
         return return_data; // doesn't need anything else if it is the background 
     }
     else {
@@ -48,12 +51,15 @@ fn vert_main(
         return_data.color = vec3(0.0, world_position[1] * instance_scale + instance_pos[1], 0.0);
 
         // pass the world position
-        return_data.world_pos = vec2(world_position[0], world_position[1]) * instance_scale + instance_pos;
+        return_data.world_pos = (vec2(world_position[0], world_position[1]) * instance_scale) + instance_pos;
+
+        return_data.is_bg = 0u;
     }
 
     return_data.slope_intercept = vec2(
-        (right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]),
-        instance_pos[1]  
+        //(right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]), // slope
+        2.0, // TODO: placeholder slope
+        instance_pos[1] + (instance_pos[0] * -1.0 * 2.0) // y axis intercept
     );
     
     return return_data;
@@ -86,14 +92,16 @@ fn frag_main(
         }
     }
 
+    if vert_data.is_bg > 0u {
+        return vec4<f32>(vert_data.color, 1.0); // print the vertex color
+    }
+
     // if this fragment falls between the waveshaping line and the zero baseline, shade it in
     if ( vert_data.world_pos[1] < (vert_data.slope_intercept[0] * vert_data.world_pos[0]) + vert_data.slope_intercept[1] /* 
          abs(vert_data.world_pos[1]) > 0.0*/ ) {
         //this is where the shader for the wave visualization is defined
         return vec4<f32>(1.0, 1.0, 1.0, 1.0); // show the shape of the wave in white
     }
-
-    return vec4<f32>(vert_data.color, 1.0); // print the vertex pos
-
-    //return vec4<f32>(0.0, 0.0, 1.0, 1.0);
+    
+    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
 }
