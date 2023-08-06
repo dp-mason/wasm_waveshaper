@@ -56,8 +56,19 @@ fn vert_main(
         return_data.is_bg = 0u;
     }
 
-    var slope:f32; 
-    slope = (right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]);
+    // nbr_wrap is a value that enables the wave shape visualiztion to wrap back to the beginning
+    // it will onlt apply to circle instances that are on the furthest right point of the screen
+    var nbr_wrap:f32;
+    if right_nbr_pos[0] < instance_pos[0] {
+        nbr_wrap = 1.0;
+    }
+    else {
+        nbr_wrap = 0.0;
+    }
+    var slope:f32;
+    // TODO: here "20.0" is a magic number representing the unit width of the screen in world coords
+    //  this will need to be brought in here so that the wrapping the wav viz works regardless of aspect ratio
+    slope = (right_nbr_pos[1] - instance_pos[1]) / ((right_nbr_pos[0] + nbr_wrap * 20.0) - instance_pos[0]);
     //const slope = 2.0, // TODO: placeholder slope
     return_data.slope_intercept = vec2(
         slope,
@@ -92,12 +103,13 @@ fn frag_main(
     }
 
     if vert_data.is_bg > 0u {
+        //leave early bc this wave viz stuff doesn't apply to the background plane
         return vec4<f32>(vert_data.color, 1.0); // print the vertex color
     }
 
     // if this fragment falls between the waveshaping line and the zero baseline, shade it in
-    if ( vert_data.world_pos[1] < (vert_data.slope_intercept[0] * vert_data.world_pos[0]) + vert_data.slope_intercept[1] /* 
-         abs(vert_data.world_pos[1]) > 0.0*/ ) {
+    if ( abs(vert_data.world_pos[1]) < abs((vert_data.slope_intercept[0] * vert_data.world_pos[0]) + vert_data.slope_intercept[1]) && 
+         abs(vert_data.world_pos[1]) > 0.0 ) {
         //this is where the shader for the wave visualization is defined
         return vec4<f32>(1.0, 1.0, 1.0, 1.0); // show the shape of the wave in white
     }
