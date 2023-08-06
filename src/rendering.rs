@@ -426,11 +426,38 @@ impl State {
     }
 
     pub fn add_circle_instance(&mut self, world_position:[f32;3], scale:f32) {
-        self.circle_instances.push(CircleInstance {
+        let new_circle = CircleInstance {
             position:world_position,
-            right_nbr_pos:[1.0, 0.0, 0.0], //TODO: placeholder negibor pos
+            right_nbr_pos:[1.0, 0.0, 0.0], //TODO: placeholder neighbor pos
             scale:scale,
-        });
+        };
+
+        // if empty list, populate the head, else search for place within list where this fits
+        match self.circle_instances.is_empty() {
+            true => {
+                self.circle_instances.push(new_circle);
+            },
+            false => {
+                
+                let res = self.circle_instances.binary_search_by(|probe| probe.position[0].total_cmp(&new_circle.position[0]));
+                match res {
+                    Ok(index) => {
+                        // binary search was able to find an element at this exact position in the node list, don't add
+                        log::warn!("Error: there is already a circle at position: {} not adding node to list", new_circle.position[0]);
+                    },
+                    Err(index) => {
+                        // binary search could not find a node at this wave position, tells us the index of where it 
+                        // would be in the list if it existed, use that to insert the node and preserve sort by wave pos
+                        self.circle_instances.insert(index, new_circle);
+                        // TODO: update the right neighbor if not at the end of the list
+                        // TODO: update the right neighbor of this new nodes left neighbor if not at beginning of list 
+                        log::warn!("node added at index: {}", index);
+                    }
+                }
+            }
+        }
+        
+        
         
         log::warn!("Content of instances is: {:?}",self.circle_instances);
         // Write the entire instances buffer again to new buffer 

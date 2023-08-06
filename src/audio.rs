@@ -46,7 +46,7 @@ impl Wave {
                 match res {
                     Ok(index) => {
                         // binary search was able to find an element at this exact position in the node list, don't add
-                        log::warn!("Error: there is already a node at position: {} not addind node to list", new_node.wave_pos);
+                        log::warn!("Error: there is already a node at position: {} not adding node to list", new_node.wave_pos);
                     },
                     Err(index) => {
                         // binary search could not find a node at this wave position, tells us the index of where it 
@@ -89,30 +89,7 @@ impl Wave {
 
         if self.node_list.len() < 2 {
             return 0.0
-        }  
-        
-        // TODO: since the wave does not necessarily span the whole buffer anymore, this loop needs refactoring
-        
-        // for node_index in 0..wave.len() - 1 {
-            //     let mut interval_start = (wave[node_index    ].wave_pos * (buf.len() as f32)).floor() as usize;
-            //     let mut interval_end   = (wave[node_index + 1].wave_pos * (buf.len() as f32)).floor() as usize;
-            
-            //     while curr_sample < interval_end {
-                //         let mut value: f32 = 0.0;
-                
-                //         // Interpolates the amplitude of samples over a subsection of the wave marked by a start and end node
-                //         // the frame offset and fract allow the wave to be generated over time independently of the buffer size
-                //         progress = (((curr_sample - interval_start) as f32 / (interval_end - interval_start) as f32) * freq_mult + frame_offset).fract();
-        //         value = wave[node_index].amplitude * (1.0f32 - progress) + wave[node_index + 1].amplitude * progress;
-                
-        //         // setting the left and right channels
-        //         buf[curr_sample].0 = value;
-        //         buf[curr_sample].1 = value;
-        
-        //         curr_sample = curr_sample + 1;
-        //     }
-        // }
-        //log::warn!("piecewise linear(): filling buf");
+        }
 
         let mut curr_sample: usize = 0;
 
@@ -153,21 +130,7 @@ impl Wave {
 
 impl std::fmt::Display for Wave {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // if let Some(ref head) = self.head {
-        //     write!(f, "Printing wave with nodes:")?;
-        //     let mut current = &**head;
-        //     loop {
-        //         write!(f, "     NODE: wave pos:{} amplitude:{}\n", current.wave_pos, current.amplitude)?;
-
-        //         if let Some(ref next) = current.next {
-        //             current = &**next;
-        //         } else {
-        //             break;
-        //         }
-        //     }
-        // }
-        // TODO: implement
-        Ok(())
+        todo!(); // TODO: implement
     }
 }
 
@@ -197,6 +160,8 @@ impl AudioState{
         // functions in the AudioBufGen module also return the progess point of the sample in the buffer
         // generated immediately after this one, this can be used as the offset for the next buffer
         // Self::piecewise_linear(buf, &mut self.play_state.as_mut().unwrap(), &self.freq_mult);
+
+        // TODO: I don't really like that the rendering methods are a part of the "wave" structure
 
         self.wave.as_mut().unwrap().piecewise_linear(buf);
     }

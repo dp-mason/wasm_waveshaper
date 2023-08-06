@@ -36,6 +36,8 @@ fn vert_main(
         // the vert shader for the background
         return_data.position = vec4<f32>(world_position, 1.0); // dont transform to clip space, the background coords are actually already in clip space
         return_data.color = vec3<f32>(color[0], color[1], 0.0);
+
+        return return_data; // doesn't need anything else if it is the background 
     }
     else {
         // the vert shader for the circle instances
@@ -71,10 +73,6 @@ fn frag_main(
         }
     }
 
-    // TODO: nothing is getting lit up white so I assume this is a coord system issue, earlier everything
-    // was lit up white when I only used the the first conditional, which is not what I was expecting to 
-    // happen
-    // calculate if this fragment falls between the wave line and baseline at zero
     if vert_data.color[1] < abs(vert_data.right_nbr_pos[1]) {
         return vec4<f32>(1.0, 1.0, 1.0, 1.0); // show the shape of the wave in white
     }
