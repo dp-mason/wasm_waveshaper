@@ -3,7 +3,8 @@
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) color:vec3<f32>, // TODO: are we overwriting the vert buffer (position part that is at loc 0) ??
-    @location(1) right_nbr_pos:vec2<f32>,
+    @location(2) slope_intercept:vec2<f32>,
+    @location(3) world_pos:vec2<f32>,
 };
 
 // !!! WGSL INTERPRETS MATRICES AS SETS OF COLUMN VECTORS !!!
@@ -45,16 +46,28 @@ fn vert_main(
         
         // todo: highlight this circle if the cursor is hovering over it
         return_data.color = vec3(0.0, world_position[1] * instance_scale + instance_pos[1], 0.0);
+
+        // pass the world position
+        return_data.world_pos = vec2(world_position[0], world_position[1]) * instance_scale + instance_pos;
     }
 
-    return_data.right_nbr_pos = vec2(right_nbr_pos[0], right_nbr_pos[1]);
+    return_data.slope_intercept = vec2(
+        (right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]),
+        instance_pos[1]  
+    );
     
     return return_data;
 }
 
 
 
-// Puts a red circle around the cursor, rest of the plane is the color of the UV position of the fragment
+// Background: Puts a red circle around the cursor, rest of the plane is the color of the UV position of the fragment
+// The Circle instances are shaded such that they show their relationship to their right neighbor
+// TODO: vert_data.color is playing several roles depending on if this is the background plane or circle instance
+//  really it stores the world position for a circle instance and the screen UV position for background plane fragments
+//  pretty confusing but i cant bother to separate it right now
+//  I think there may be some advantages to having everything be in one shader as far as effects, but the professional
+//  thing to do would be to have separate shaders and draw call for the background and circle instances. Oh well...
 @fragment
 fn frag_main(
     vert_data: VertexOutput, 
@@ -73,7 +86,10 @@ fn frag_main(
         }
     }
 
-    if vert_data.color[1] < abs(vert_data.right_nbr_pos[1]) {
+    // if this fragment falls between the waveshaping line and the zero baseline, shade it in
+    if ( vert_data.world_pos[1] < (vert_data.slope_intercept[0] * vert_data.world_pos[0]) + vert_data.slope_intercept[1] /* 
+         abs(vert_data.world_pos[1]) > 0.0*/ ) {
+        //this is where the shader for the wave visualization is defined
         return vec4<f32>(1.0, 1.0, 1.0, 1.0); // show the shape of the wave in white
     }
 

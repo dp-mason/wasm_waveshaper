@@ -539,7 +539,7 @@ impl State {
             },
             None => {
                 log::warn!("new circle created at world location: {:?}", world_loc);
-                self.add_circle_instance([world_loc[0], world_loc[1], world_loc[2]], 2.000000);
+                self.add_circle_instance([world_loc[0], world_loc[1], world_loc[2]], 1.0);
             }
         }
     }
@@ -562,7 +562,7 @@ impl State {
                     },
                     None => {
                         log::warn!("new circle created at world location: {:?}", cursor_world_pos);
-                        self.add_circle_instance([cursor_world_pos[0], cursor_world_pos[1], cursor_world_pos[2]], 0.2);
+                        self.add_circle_instance([cursor_world_pos[0], cursor_world_pos[1], cursor_world_pos[2]], 1.0);
                     }
                 }
             },
