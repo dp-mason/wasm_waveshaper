@@ -56,10 +56,12 @@ fn vert_main(
         return_data.is_bg = 0u;
     }
 
+    var slope:f32; 
+    slope = (right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]);
+    //const slope = 2.0, // TODO: placeholder slope
     return_data.slope_intercept = vec2(
-        //(right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]), // slope
-        2.0, // TODO: placeholder slope
-        instance_pos[1] + (instance_pos[0] * -1.0 * 2.0) // y axis intercept
+        slope,
+        (instance_pos[1] + (instance_pos[0] * -1.0 * slope)) // y axis intercept
     );
     
     return return_data;
@@ -69,10 +71,7 @@ fn vert_main(
 
 // Background: Puts a red circle around the cursor, rest of the plane is the color of the UV position of the fragment
 // The Circle instances are shaded such that they show their relationship to their right neighbor
-// TODO: vert_data.color is playing several roles depending on if this is the background plane or circle instance
-//  really it stores the world position for a circle instance and the screen UV position for background plane fragments
-//  pretty confusing but i cant bother to separate it right now
-//  I think there may be some advantages to having everything be in one shader as far as effects, but the professional
+// TODO: I think there may be some advantages to having everything be in one shader as far as effects, but the professional
 //  thing to do would be to have separate shaders and draw call for the background and circle instances. Oh well...
 @fragment
 fn frag_main(
