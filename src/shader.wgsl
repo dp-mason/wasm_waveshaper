@@ -112,7 +112,7 @@ fn frag_main(
          vert_data.world_pos[1] > 0.0) ||
          (vert_data.world_pos[1] > (vert_data.slope_intercept[0] * vert_data.world_pos[0]) + vert_data.slope_intercept[1] &&
          vert_data.world_pos[1] < 0.0 )
-       ) {
+    ) {
         //this is where the shader for the wave visualization is defined
         return vec4<f32>(1.0, 1.0, 1.0, 1.0); // show the shape of the wave in white
     }

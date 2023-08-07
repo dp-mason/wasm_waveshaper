@@ -75,26 +75,35 @@ const VERTICES:&[Vertex] = &[
     Vertex{position: [-1.0, -1.0, 1.0], color: [0.0, 1.0, 0.0]}, // bottom left
 
     // Circle
-    Vertex{ position: [ 0.000000, -1.000000, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.382683, -0.923880, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.707107, -0.707107, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.923880, -0.382683, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-1.000000,  0.000000, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.923880,  0.382683, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.707107,  0.707107, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.382683,  0.923880, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.000000,  1.000000, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.382683,  0.923880, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.707107,  0.707107, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.923880,  0.382684, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 1.000000, -0.000000, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.923879, -0.382684, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.707107, -0.707107, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.382683, -0.923880, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.000000, -0.000000, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [ 0.000000, -1.000000, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [-0.382683, -0.923880, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [-0.707107, -0.707107, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [-0.923880, -0.382683, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [-1.000000,  0.000000, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [-0.923880,  0.382683, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [-0.707107,  0.707107, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [-0.382683,  0.923880, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [ 0.000000,  1.000000, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [ 0.382683,  0.923880, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [ 0.707107,  0.707107, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [ 0.923880,  0.382684, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [ 1.000000, -0.000000, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [ 0.923879, -0.382684, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [ 0.707107, -0.707107, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [ 0.382683, -0.923880, 0.5], color: [1.0, 0.0, 1.0] },
+    // Vertex{ position: [-0.000000, -0.000000, 0.5], color: [1.0, 0.0, 1.0] },
+
+    // WaveCard
+    Vertex{position: [1.0,  20.0, 1.0], color: [1.0, 0.0, 0.0]}, // top right
+    Vertex{position: [0.0,  20.0, 1.0], color: [0.0, 0.0, 0.0]}, // top left
+    Vertex{position: [1.0, -20.0, 1.0], color: [1.0, 1.0, 0.0]}, // bottom right
+    Vertex{position: [0.0, -20.0, 1.0], color: [0.0, 1.0, 0.0]}, // bottom left
 ];
 
-const CIRCLE_START_OFFSET:u16 = 3; // would be four, but wavefront obj format starts indexing from one for some reason
+// would be four, but wavefront obj format starts indexing from one for some reason
+// ^^^ the numbers were taken from a wavefront obj file I exported
+// TODO: I changed the offset to four to test creating the WaveCards, change it back if u use circles again
+const CIRCLE_START_OFFSET:u16 = 4; 
 
 const TRI_INDEX_BUFFER:&[u16] = &[
     // Background Filling Triangles
@@ -102,22 +111,26 @@ const TRI_INDEX_BUFFER:&[u16] = &[
     2, 1, 3,
     
     // Circle
-     1 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  2 + CIRCLE_START_OFFSET,
-     2 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  3 + CIRCLE_START_OFFSET,
-     3 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  4 + CIRCLE_START_OFFSET,
-     4 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  5 + CIRCLE_START_OFFSET,
-     5 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  6 + CIRCLE_START_OFFSET,
-     6 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  7 + CIRCLE_START_OFFSET,
-     7 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  8 + CIRCLE_START_OFFSET,
-     8 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  9 + CIRCLE_START_OFFSET,
-     9 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 10 + CIRCLE_START_OFFSET,
-    10 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 11 + CIRCLE_START_OFFSET,
-    11 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 12 + CIRCLE_START_OFFSET,
-    12 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 13 + CIRCLE_START_OFFSET,
-    13 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 14 + CIRCLE_START_OFFSET,
-    14 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 15 + CIRCLE_START_OFFSET,
-    15 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 16 + CIRCLE_START_OFFSET,
-    16 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  1 + CIRCLE_START_OFFSET,
+    //  1 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  2 + CIRCLE_START_OFFSET,
+    //  2 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  3 + CIRCLE_START_OFFSET,
+    //  3 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  4 + CIRCLE_START_OFFSET,
+    //  4 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  5 + CIRCLE_START_OFFSET,
+    //  5 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  6 + CIRCLE_START_OFFSET,
+    //  6 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  7 + CIRCLE_START_OFFSET,
+    //  7 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  8 + CIRCLE_START_OFFSET,
+    //  8 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  9 + CIRCLE_START_OFFSET,
+    //  9 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 10 + CIRCLE_START_OFFSET,
+    // 10 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 11 + CIRCLE_START_OFFSET,
+    // 11 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 12 + CIRCLE_START_OFFSET,
+    // 12 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 13 + CIRCLE_START_OFFSET,
+    // 13 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 14 + CIRCLE_START_OFFSET,
+    // 14 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 15 + CIRCLE_START_OFFSET,
+    // 15 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET, 16 + CIRCLE_START_OFFSET,
+    // 16 + CIRCLE_START_OFFSET, 17 + CIRCLE_START_OFFSET,  1 + CIRCLE_START_OFFSET,
+
+    // WaveCard
+    2 + CIRCLE_START_OFFSET, 1 + CIRCLE_START_OFFSET, 3 + CIRCLE_START_OFFSET,
+    2 + CIRCLE_START_OFFSET, 0 + CIRCLE_START_OFFSET, 1 + CIRCLE_START_OFFSET
 ];
 
 fn dot_product(transform_matrix:[[f32;4];4], vector:[f32;4]) -> [f32;4]{
@@ -428,7 +441,7 @@ impl State {
     pub fn add_circle_instance(&mut self, world_position:[f32;3], scale:f32) {
         let new_circle = CircleInstance {
             position:world_position,
-            right_nbr_pos:[1.0, 0.0, 0.0], //TODO: placeholder neighbor pos
+            right_nbr_pos:[world_position[0], 0.0, 0.0], //TODO: placeholder neighbor pos
             scale:scale,
         };
 
