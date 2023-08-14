@@ -52,10 +52,10 @@ fn vert_main(
     //  this will need to be brought in here so that the wrapping the wav viz works regardless of aspect ratio
     var ext:vec3<f32>;
     if right_nbr_pos[0] < instance_pos[0] {
-        ext = vec3(20.0, 1.0, 0.0);
+        ext = vec3(20.0, 20.0, 0.0);
     }
     else {
-        ext = vec3(1.0, 1.0, 1.0);
+        ext = vec3(right_nbr_pos[0] - instance_pos[0], 20.0, 1.0);
     }
 
     // pass the world position
