@@ -52,10 +52,10 @@ fn vert_main(
     //  this will need to be brought in here so that the wrapping the wav viz works regardless of aspect ratio
     var ext:vec3<f32>;
     if right_nbr_pos[0] < instance_pos[0] {
-        ext = vec3(20.0, 20.0, 0.0);
+        ext = vec3(20.0, 100.0, 0.0);
     }
     else {
-        ext = vec3(right_nbr_pos[0] - instance_pos[0], 20.0, 1.0);
+        ext = vec3(right_nbr_pos[0] - instance_pos[0], 100.0, 1.0);
     }
 
     // pass the world position
@@ -67,6 +67,8 @@ fn vert_main(
     // todo: highlight this circle if the cursor is hovering over it
     return_data.color = vec3(0.0, world_position[1] * instance_scale + instance_pos[1], 0.0);
 
+    // TODO: rightmost slope is wrong because it does not take into account that the position of the right neighbor of the
+    // rightmost node shuld be treated as though it is off screen to the right in order to appear cyclical
     var slope:f32;
     slope = (right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]);
     //const slope = 2.0, // TODO: placeholder slope
@@ -117,5 +119,7 @@ fn frag_main(
         return vec4<f32>(1.0, 1.0, 1.0, 1.0); // show the shape of the wave in white
     }
     
-    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    // transparent, because not in area under the waveshape, shows the webpage background not background plane :(
+    // there must need to be multiple draw calls if I want one plane rendered on top of the other?
+    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
 }
