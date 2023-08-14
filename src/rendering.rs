@@ -30,7 +30,7 @@ struct GraphicsInput {
 struct CircleInstance {
     position:[f32;3],
     right_nbr_pos:[f32;3],
-    scale:f32,
+    scale:f32
 }
 impl CircleInstance {
     // returns a vertex buffer layout used for storing this data type in a Vertex Buffer
@@ -94,10 +94,10 @@ const VERTICES:&[Vertex] = &[
     // Vertex{ position: [-0.000000, -0.000000, 0.5], color: [1.0, 0.0, 1.0] },
 
     // WaveCard
-    Vertex{position: [1.0,  20.0, 1.0], color: [1.0, 0.0, 0.0]}, // top right
-    Vertex{position: [0.0,  20.0, 1.0], color: [0.0, 0.0, 0.0]}, // top left
-    Vertex{position: [1.0, -20.0, 1.0], color: [1.0, 1.0, 0.0]}, // bottom right
-    Vertex{position: [0.0, -20.0, 1.0], color: [0.0, 1.0, 0.0]}, // bottom left
+    Vertex{position: [ 1.0,  0.5, 1.0], color: [1.0, 0.0, 0.0]}, // top right
+    Vertex{position: [ 0.0,  0.5, 1.0], color: [0.0, 0.0, 0.0]}, // top left
+    Vertex{position: [ 1.0, -0.5, 1.0], color: [1.0, 1.0, 0.0]}, // bottom right
+    Vertex{position: [ 0.0, -0.5, 1.0], color: [0.0, 1.0, 0.0]}, // bottom left
 ];
 
 // would be four, but wavefront obj format starts indexing from one for some reason
@@ -320,7 +320,7 @@ impl State {
         let graphics_input = GraphicsInput {
             cursor_position:cursor_pos,
             world_to_clip_transfm:world_to_clip_transfm,
-            canvas_dimensions:[size.height, size.width, 0, 0]
+            canvas_dimensions:[size.height, size.width, 0, 0],
         };
 
         // create uniform buffer for the cursor position and other info such as aspect ratio
@@ -552,36 +552,36 @@ impl State {
             },
             None => {
                 log::warn!("new circle created at world location: {:?}", world_loc);
-                self.add_circle_instance([world_loc[0], world_loc[1], world_loc[2]], 1.0);
+                self.add_circle_instance([world_loc[0], world_loc[1], world_loc[2]], 3.0);
             }
         }
     }
 
-    pub fn add_circle_at_cursor_location(&mut self, state:&ElementState, button:&MouseButton){
-        match state {
-            ElementState::Pressed => {
+    // pub fn add_circle_at_cursor_location(&mut self, state:&ElementState, button:&MouseButton){
+    //     match state {
+    //         ElementState::Pressed => {
                 
-                let cursor_clip_pos = self.get_cursor_clip_location();
-                let cursor_world_pos = dot_product(self.clip_to_world_transform, cursor_clip_pos);
+    //             let cursor_clip_pos = self.get_cursor_clip_location();
+    //             let cursor_world_pos = dot_product(self.clip_to_world_transform, cursor_clip_pos);
                 
-                // determine whether the clicked position is within an existing circle
-                match self.circle_at_location([cursor_world_pos[0], cursor_world_pos[1]]) {
-                    Some(index) => {
-                        log::warn!("Clicked circle at index: {index}");
-                        match self.expand_circle(index) {
-                            Err(msg) => log::warn!("{msg}"),
-                            Ok(_) => {}
-                        }
-                    },
-                    None => {
-                        log::warn!("new circle created at world location: {:?}", cursor_world_pos);
-                        self.add_circle_instance([cursor_world_pos[0], cursor_world_pos[1], cursor_world_pos[2]], 1.0);
-                    }
-                }
-            },
-            ElementState::Released => {/* TODO, could add another UI effect when the button is released, like a ripple */}
-        }
-    }
+    //             // determine whether the clicked position is within an existing circle
+    //             match self.circle_at_location([cursor_world_pos[0], cursor_world_pos[1]]) {
+    //                 Some(index) => {
+    //                     log::warn!("Clicked circle at index: {index}");
+    //                     match self.expand_circle(index) {
+    //                         Err(msg) => log::warn!("{msg}"),
+    //                         Ok(_) => {}
+    //                     }
+    //                 },
+    //                 None => {
+    //                     log::warn!("new circle created at world location: {:?}", cursor_world_pos);
+    //                     self.add_circle_instance([cursor_world_pos[0], cursor_world_pos[1], cursor_world_pos[2]], 1.0);
+    //                 }
+    //             }
+    //         },
+    //         ElementState::Released => {/* TODO, could add another UI effect when the button is released, like a ripple */}
+    //     }
+    // }
 
     // this is where more user input for rendering can be added
     pub fn input(&mut self, event: &WindowEvent) -> bool {

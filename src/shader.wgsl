@@ -4,7 +4,7 @@ struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) color:vec3<f32>, // TODO: are we overwriting the vert buffer (position part that is at loc 0) ??
     @location(2) slope_intercept:vec2<f32>,
-    @location(3) world_pos:vec2<f32>,
+    @location(3) world_pos:vec3<f32>,
     @location(4) is_bg:u32,
 };
 
@@ -43,32 +43,32 @@ fn vert_main(
 
         return return_data; // doesn't need anything else if it is the background 
     }
-    else {
-        // the vert shader for the circle instances
-        return_data.position = graphics_input.world_to_clip_transfm * vec4(world_position * instance_scale + vec3(instance_pos, 0.0), 1.0);
-        
-        // todo: highlight this circle if the cursor is hovering over it
-        return_data.color = vec3(0.0, world_position[1] * instance_scale + instance_pos[1], 0.0);
-
-        // pass the world position
-        return_data.world_pos = (vec2(world_position[0], world_position[1]) * instance_scale) + instance_pos;
-
-        return_data.is_bg = 0u;
-    }
-
-    // nbr_wrap is a value that enables the wave shape visualiztion to wrap back to the beginning
+    
+    return_data.is_bg = 0u;
+    
+    // nbr_wrap is a value that enables the wave shape visualization to extend past the right border of the screen
     // it will onlt apply to circle instances that are on the furthest right point of the screen
-    var nbr_wrap:f32;
-    if right_nbr_pos[0] < instance_pos[0] {
-        nbr_wrap = 1.0;
-    }
-    else {
-        nbr_wrap = 0.0;
-    }
-    var slope:f32;
     // TODO: here "20.0" is a magic number representing the unit width of the screen in world coords
     //  this will need to be brought in here so that the wrapping the wav viz works regardless of aspect ratio
-    slope = (right_nbr_pos[1] - instance_pos[1]) / ((right_nbr_pos[0] + nbr_wrap * 20.0) - instance_pos[0]);
+    var ext:vec3<f32>;
+    if right_nbr_pos[0] < instance_pos[0] {
+        ext = vec3(20.0, 1.0, 0.0);
+    }
+    else {
+        ext = vec3(1.0, 1.0, 1.0);
+    }
+
+    // pass the world position
+    return_data.world_pos = world_position * vec3(instance_scale, instance_scale, 1.0) * ext + vec3(instance_pos, 0.0);
+
+    // the vert shader for the circle instances
+    return_data.position = graphics_input.world_to_clip_transfm * vec4(return_data.world_pos, 1.0);
+    
+    // todo: highlight this circle if the cursor is hovering over it
+    return_data.color = vec3(0.0, world_position[1] * instance_scale + instance_pos[1], 0.0);
+
+    var slope:f32;
+    slope = (right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]);
     //const slope = 2.0, // TODO: placeholder slope
     return_data.slope_intercept = vec2(
         slope,
