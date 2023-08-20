@@ -4,7 +4,7 @@ mod audio;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    window::{WindowBuilder},
+    window::{WindowBuilder}, dpi::Position,
 };
 
 use web_sys;
@@ -40,8 +40,17 @@ impl ShaperState {
                             },
                             _ => {}
                         }
-                        
                     },
+                    WindowEvent::MouseWheel { device_id, delta, phase, modifiers } => { 
+                        self.sound_engine.apply_delta_to_frequency(match delta {
+                            MouseScrollDelta::LineDelta(x, y) => {
+                                y * 0.001
+                            },
+                            MouseScrollDelta::PixelDelta(pos) => {
+                                pos.y as f32 * 0.001
+                            },
+                        });
+                    }
                     _ => {}
                 }
             }

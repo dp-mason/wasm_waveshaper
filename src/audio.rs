@@ -35,9 +35,12 @@ impl Wave {
         Wave { node_list:vec![init_node], curr_node_index:0, curr_node:init_node.clone(), interval_progress:0.0f32, freq_mult:2.0 }
     }
 
+    pub fn set_freq(&mut self, new_freq:f32){
+        self.freq_mult = new_freq.clamp(0.0, 100.0)
+    }
+
     // Add a node to the wave
-    fn insert_node(&mut self, new_node:WaveNode) {
-        
+    fn insert_node(&mut self, new_node:WaveNode) { 
         // if empty list, populate the head, else search for place within list where this fits
         match self.node_list.is_empty() {
             true => self.node_list.push(new_node),
@@ -149,7 +152,12 @@ impl AudioState{
         }
     }
 
-    
+    pub fn set_new_freq_from_delta(&mut self, delta:f32) {
+        // TODO: learn how the "cents" pitch measurement system works, just increaing the multiplier linearly makes it so the pitch goes up
+        // a lot more with each step than it does in the lower registers. I want a smooth pitch transition
+        let curr_freq = self.wave.as_mut().unwrap().freq_mult;
+        self.wave.as_mut().unwrap().set_freq(curr_freq + delta);
+    }
 
     pub fn render(&mut self, buf: &mut [(f32, f32)], params: tinyaudio::OutputDeviceParameters) {
         buf.fill((0.0, 0.0));
@@ -251,6 +259,10 @@ impl SoundEngine {
 
     pub fn print_node_list(&self) {
         log::warn!("state of audio node list is now: {:?}", self.state().wave.as_ref().unwrap().node_list)
+    }
+
+    pub fn apply_delta_to_frequency(&self, delta:f32){
+        self.state().set_new_freq_from_delta(delta);
     }
 
     pub fn handle_audio_maintenance_events(&mut self, event: &Event<()>, control_flow: &mut ControlFlow){

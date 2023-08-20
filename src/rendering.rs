@@ -1,4 +1,3 @@
-
 // Received a ton of help from: https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#first-some-housekeeping-state
 use wgpu::{Instance, util::DeviceExt, DynamicOffset};
 use winit::{
@@ -254,7 +253,7 @@ impl State {
 
         let circle_instances: [CircleInstance; 0] = [
             // CircleInstance {
-            //     position:[0.0, 0.0, 0.0],
+            //     position:[-10.0, 0.0, 0.0], // -10 is a magic number that ensures the first node is flush with the left of screen
             //     scale:1.0, //TODO: bruh this is a hack, figure this shit out
             //     right_nbr_pos:[10.0, 0.0, 0.0], // TODO: 10 is a migic num and this is a placeholder nyways
             // },

@@ -67,10 +67,16 @@ fn vert_main(
     // todo: highlight this circle if the cursor is hovering over it
     return_data.color = vec3(0.0, world_position[1] * instance_scale + instance_pos[1], 0.0);
 
-    // TODO: rightmost slope is wrong because it does not take into account that the position of the right neighbor of the
-    // rightmost node shuld be treated as though it is off screen to the right in order to appear cyclical
     var slope:f32;
-    slope = (right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]);
+    // rightmost slope takes into account that the position of the right neighbor of the
+    // rightmost node should be treated as though it is off screen to the right in order to appear cyclical
+    if (right_nbr_pos[0] < instance_pos[0]) {
+        // TODO: replace magic number 20.0, I think the top left elem of the world transform matrix contains the viewport x scale in world coords
+        slope = (right_nbr_pos[1] - instance_pos[1]) / ( (right_nbr_pos[0] + 20.0) - instance_pos[0] );
+    } else {
+        // normal slope calculation
+        slope = (right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]);
+    }
     //const slope = 2.0, // TODO: placeholder slope
     return_data.slope_intercept = vec2(
         slope,
