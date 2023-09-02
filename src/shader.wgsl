@@ -81,10 +81,10 @@ fn vert_main(
 
     var slope:f32;
     // rightmost slope takes into account that the position of the right neighbor of the
-    // rightmost node should be treated as though it is off screen to the right in order to appear cyclical
+    // rightmost node's right neighbor should be treated as though it is off screen to the right in order to appear cyclical
     if (right_nbr_pos[0] < instance_pos[0]) {
-        // TODO: replace magic number 20.0, I think the top left elem of the world transform matrix contains the viewport x scale in world coords
-        slope = (right_nbr_pos[1] - instance_pos[1]) / ( (right_nbr_pos[0] + 20.0) - instance_pos[0] );
+        // world_to_clip_transfm[1][1] represents the current world scale
+        slope = (right_nbr_pos[1] - instance_pos[1]) / ( (right_nbr_pos[0] + 2.0 * (1.0/graphics_input.world_to_clip_transfm[1][1])) - instance_pos[0] );
     } else {
         // normal slope calculation
         slope = (right_nbr_pos[1] - instance_pos[1]) / (right_nbr_pos[0] - instance_pos[0]);

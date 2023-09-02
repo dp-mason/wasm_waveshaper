@@ -31,8 +31,8 @@ impl ShaperState {
             Event::WindowEvent {event,..} => {
                 match event {
                     WindowEvent::MouseInput { state, button,.. } => {
-                        match button {
-                            MouseButton::Left if state == &ElementState::Pressed => {
+                        match (button, state) {
+                            (MouseButton::Left, ElementState::Pressed) => {
                                 let new_node_loc = self.render_state.get_cursor_clip_location();
                                 self.render_state.add_circle_at_clip_location(new_node_loc);
                                 self.sound_engine.add_node( ((new_node_loc[0] + 1.0) / 2.0), new_node_loc[1]);
