@@ -1,3 +1,5 @@
+use std::slice;
+
 // Received a ton of help from: https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#first-some-housekeeping-state
 use wgpu::{Instance, util::DeviceExt, DynamicOffset};
 use winit::{
@@ -238,6 +240,32 @@ fn dot_product(transform_matrix:[[f32;4];4], vector:[f32;4]) -> [f32;4]{
     ]
 }
 
+fn create_clip_to_wrld_mat(world_scale:f32, aspect_ratio:f32) -> [[f32;4];4] {
+
+    // !!! WGSL INTERPRETS MATRICES AS SETS OF COLUMN VECTORS !!!
+    // example: mat2x3 data type in wgsl is a matrix with 2 columns and 3 rows
+    // https://gpuweb.github.io/gpuweb/wgsl/#matrix-types
+    [
+        [1.0 / (aspect_ratio*world_scale),         0.0      , 0.0, 0.0],
+        [               0.0              , 1.0 / world_scale, 0.0, 0.0],
+        [               0.0              ,         0.0      , 1.0, 0.0],
+        [               0.0              ,         0.0      , 0.0, 1.0],
+    ]
+}
+
+fn create_wrld_to_clip_mat(world_scale:f32, aspect_ratio:f32) -> [[f32;4];4] {
+
+    // !!! WGSL INTERPRETS MATRICES AS SETS OF COLUMN VECTORS !!!
+    // example: mat2x3 data type in wgsl is a matrix with 2 columns and 3 rows
+    // https://gpuweb.github.io/gpuweb/wgsl/#matrix-types
+    [
+        [aspect_ratio * world_scale,     0.0    , 0.0, 0.0],
+        [            0.0           , world_scale, 0.0, 0.0],
+        [            0.0           ,     0.0    , 1.0, 0.0],
+        [            0.0           ,     0.0    , 0.0, 1.0],
+    ]
+}
+
 pub struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -253,6 +281,7 @@ pub struct State {
     aspect_ratio:f32,
     world_scale:f32,
     clip_to_world_transform:[[f32;4];4],
+    world_to_clip_transform:[[f32;4];4],
     
     graphics_input_buffer: wgpu::Buffer,
     
@@ -266,6 +295,9 @@ pub struct State {
     circle_instances_buffer: wgpu::Buffer,
 }
 impl State {
+
+    // TODO: function to get current scale from tranfm
+
     pub async fn new(window: Window) -> Self {
         let size = window.inner_size();
 
@@ -399,8 +431,8 @@ impl State {
         // !!! WGSL INTERPRETS MATRICES AS SETS OF COLUMN VECTORS !!!
         // example: mat2x3 data type in wgsl is a matrix with 2 columns and 3 rows
         // https://gpuweb.github.io/gpuweb/wgsl/#matrix-types
-        let world_scale:f32 = 0.1;
-        let world_to_clip_transfm:[[f32;4];4] = [
+        let world_scale:f32 = 1.0;
+        let world_to_clip_transform:[[f32;4];4] = [
             [aspect_ratio * world_scale,     0.0    , 0.0, 0.0],
             [            0.0           , world_scale, 0.0, 0.0],
             [            0.0           ,     0.0    , 1.0, 0.0],
@@ -415,7 +447,7 @@ impl State {
 
         let graphics_input = GraphicsInput {
             cursor_position:cursor_pos,
-            world_to_clip_transfm:world_to_clip_transfm,
+            world_to_clip_transfm:world_to_clip_transform,
             canvas_dimensions:[size.height, size.width, 0, 0],
         };
 
@@ -519,6 +551,7 @@ impl State {
             aspect_ratio,
             world_scale,
             clip_to_world_transform,
+            world_to_clip_transform,
 
             cursor_pos:[0.0, 0.0],
             graphics_input_buffer,
@@ -532,6 +565,36 @@ impl State {
             circle_instances:circle_instances.to_vec(),
             circle_instances_buffer
         }
+    }
+
+    pub fn update_world_scale(&mut self, new_scale:f32) {
+        self.clip_to_world_transform = create_clip_to_wrld_mat(new_scale, 1.0); // Aspect Ratio will need to change with support for non square
+        
+
+        let graphics_input = GraphicsInput {
+            cursor_position:[self.cursor_pos[0], self.cursor_pos[1], 0.0, 0.5],
+            world_to_clip_transfm:create_wrld_to_clip_mat(new_scale, 1.0),
+            canvas_dimensions:[self.size.height, self.size.width, 0, 0],
+        };
+        
+        self.queue.write_buffer(
+            &self.graphics_input_buffer, 
+            0, 
+            bytemuck::bytes_of(&graphics_input)
+        );
+    }
+
+    fn update_circle_instances_buf(&mut self){
+        // Write the entire instances buffer again to new buffer 
+        // TODO: this is bad, use offset instead if there is extra capacity, reset the buff once it has reach capacity
+        //self.cursor_pos_buffer.unmap();
+        self.circle_instances_buffer = self.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Circle Instance Buffer, Grown"),
+                contents: bytemuck::cast_slice(&self.circle_instances.as_slice()),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
     }
 
     pub fn add_circle_instance(&mut self, world_position:[f32;3], scale:f32) {
@@ -570,20 +633,29 @@ impl State {
             }
         }
         
-        
-        
         log::warn!("Content of instances is: {:?}",self.circle_instances);
-        // Write the entire instances buffer again to new buffer 
-        // TODO: this is bad, use offset instead if there is extra capacity, reset the buff once it has reach capacity
-        //self.cursor_pos_buffer.unmap();
-        self.circle_instances_buffer = self.device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Circle Instance Buffer, Grown"),
-                contents: bytemuck::cast_slice(&self.circle_instances.as_slice()),
-                usage: wgpu::BufferUsages::VERTEX,
-            }
-        );
+
+        self.update_circle_instances_buf();
     }
+
+    // copy the visual state of the wave and shift it to the end of the current wave
+    // TODO: this double the wave length, DANGEROUS! can get out of hand exponentially
+    // fn extend_wave(&mut self){
+    //     let new_circle = CircleInstance {
+    //         position:[0.0, 0.0, 0.0],
+    //         right_nbr_pos:[0.0, 0.0, 0.0],
+    //         scale:1.0,
+    //     };
+
+    //     self.circle_instances.resize(self.circle_instances.len(), new_circle);
+
+    //     // iterate through second half of array, populating it with elems from the first
+    //     for curr_index in 0..(self.circle_instances.len() / 2) {
+    //         self.circle_instances[curr_index + (self.circle_instances.len() / 2)] = self.circle_instances[curr_index];
+
+
+    //     }
+    // }
 
     // takes a position in clip space (usually the mouse location) and returns the index of the circle instance
     // that exists there if one exists
@@ -653,32 +725,6 @@ impl State {
         }
     }
 
-    // pub fn add_circle_at_cursor_location(&mut self, state:&ElementState, button:&MouseButton){
-    //     match state {
-    //         ElementState::Pressed => {
-                
-    //             let cursor_clip_pos = self.get_cursor_clip_location();
-    //             let cursor_world_pos = dot_product(self.clip_to_world_transform, cursor_clip_pos);
-                
-    //             // determine whether the clicked position is within an existing circle
-    //             match self.circle_at_location([cursor_world_pos[0], cursor_world_pos[1]]) {
-    //                 Some(index) => {
-    //                     log::warn!("Clicked circle at index: {index}");
-    //                     match self.expand_circle(index) {
-    //                         Err(msg) => log::warn!("{msg}"),
-    //                         Ok(_) => {}
-    //                     }
-    //                 },
-    //                 None => {
-    //                     log::warn!("new circle created at world location: {:?}", cursor_world_pos);
-    //                     self.add_circle_instance([cursor_world_pos[0], cursor_world_pos[1], cursor_world_pos[2]], 1.0);
-    //                 }
-    //             }
-    //         },
-    //         ElementState::Released => {/* TODO, could add another UI effect when the button is released, like a ripple */}
-    //     }
-    // }
-
     // this is where more user input for rendering can be added
     pub fn input(&mut self, event: &WindowEvent) -> bool {
         // match to some input events you want to handle
@@ -706,9 +752,10 @@ impl State {
         }
     }
 
-    pub fn update(&mut self) {
+    // TODO: function that updates world scale, clamped. Exposed so that lib.rs can use it to zoom in and out on the wave
+    // pub fn update_world_scale(&mut self) {
 
-    }
+    // }
 
     pub async fn init_rendering() -> (EventLoop<()>, State) {
         cfg_if::cfg_if! {
@@ -841,7 +888,7 @@ impl State {
                 }
             }
             Event::RedrawRequested(window_id) if window_id == &self.window().id() => {
-                self.update();
+                //self.update();
                 match self.render() {
                     Ok(_) => {}
                     // Reconfigure the surface if it's lost or outdated
