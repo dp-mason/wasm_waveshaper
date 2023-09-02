@@ -44,12 +44,21 @@ impl ShaperState {
                     WindowEvent::MouseWheel { device_id, delta, phase, modifiers } => { 
                         self.sound_engine.apply_delta_to_frequency(match delta {
                             MouseScrollDelta::LineDelta(x, y) => {
-                                y * 0.001
+                                y * 0.001 //TODO: remove magic number
                             },
                             MouseScrollDelta::PixelDelta(pos) => {
-                                pos.y as f32 * 0.001
+                                pos.y as f32 * 0.001 //TODO: remove magic number
                             },
                         });
+                    },
+                    WindowEvent::KeyboardInput { device_id, input, is_synthetic } => {
+                        // KEYBOARD INPUT SECTION
+                        match (input.virtual_keycode, input.state) {
+                            (Some(VirtualKeyCode::S), ElementState::Pressed) => {
+                                self.render_state.update_world_scale(self.render_state.get_world_scale() * 0.3);
+                            },
+                            _ => {},
+                        }
                     }
                     _ => {}
                 }

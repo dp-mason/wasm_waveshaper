@@ -296,8 +296,6 @@ pub struct State {
 }
 impl State {
 
-    // TODO: function to get current scale from tranfm
-
     pub async fn new(window: Window) -> Self {
         let size = window.inner_size();
 
@@ -567,9 +565,15 @@ impl State {
         }
     }
 
+    // returns the current world scale, by pulling it from the world to clip transform
+    // unaffected by the aspect ratio
+    pub fn get_world_scale(&self) -> f32{
+        self.world_to_clip_transform[1][1]
+    }
+
     pub fn update_world_scale(&mut self, new_scale:f32) {
         self.clip_to_world_transform = create_clip_to_wrld_mat(new_scale, 1.0); // Aspect Ratio will need to change with support for non square
-        
+        self.world_to_clip_transform = create_wrld_to_clip_mat(new_scale, 1.0); // Aspect Ratio will need to change with support for non square
 
         let graphics_input = GraphicsInput {
             cursor_position:[self.cursor_pos[0], self.cursor_pos[1], 0.0, 0.5],
