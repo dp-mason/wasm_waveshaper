@@ -62,16 +62,18 @@ fn vert_main(
     // it will onlt apply to circle instances that are on the furthest right point of the screen
     // TODO: here "20.0" is a magic number representing the unit width of the screen in world coords
     //  this will need to be brought in here so that the wrapping the wav viz works regardless of aspect ratio
-    var ext:vec3<f32>;
+    var card_scale:vec3<f32>;
+    // max_ext can be aaplied to x or y scale to make the card extend past the edges of the view
+    var max_ext:f32 = (1.0/graphics_input.world_to_clip_transfm[1][1]) * 4.0;
     if right_nbr_pos[0] < instance_pos[0] {
-        ext = vec3(20.0, 100.0, 0.0);
+        card_scale = vec3(max_ext, max_ext, 0.0);
     }
     else {
-        ext = vec3(right_nbr_pos[0] - instance_pos[0], 100.0, 1.0);
+        card_scale = vec3(right_nbr_pos[0] - instance_pos[0], max_ext, 1.0);
     }
 
     // pass the world position
-    return_data.world_pos = world_position * vec3(instance_scale, instance_scale, 1.0) * ext + vec3(instance_pos, 0.0);
+    return_data.world_pos = world_position * vec3(instance_scale, instance_scale, 1.0) * card_scale + vec3(instance_pos, 0.0);
 
     // the vert shader for the circle instances
     return_data.position = graphics_input.world_to_clip_transfm * vec4(return_data.world_pos, 1.0);
