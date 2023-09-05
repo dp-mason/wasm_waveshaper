@@ -10,6 +10,13 @@ use winit::{
 use web_sys;
 use wasm_bindgen::prelude::*;
 
+//converts an entire exported visual state to a format that the audio renderer can recognize as a wave shape
+// based on the anchors in the visual state and whether the anchors are in scope
+fn wave_shape_from_visual_state(visual_state:rendering::VisualState) -> Vec<audio::WaveNode> {
+    // TODO: use filter pattern here in the spirit of functional programming
+    return vec![]
+}
+
 //TODO: shaper state is basically the UI layer. Why does it "own" instances of AudioState and RenderState?
 
 pub struct ShaperState {
@@ -57,6 +64,10 @@ impl ShaperState {
                             (Some(VirtualKeyCode::S), ElementState::Pressed) => {
                                 self.render_state.update_world_scale(self.render_state.get_world_scale() * 0.3);
                             },
+                            (Some(VirtualKeyCode::R), ElementState::Pressed) => {
+                                // export the current visual state, load the audio state with a new wave based on the exported state
+                                
+                            }
                             _ => {},
                         }
                     }

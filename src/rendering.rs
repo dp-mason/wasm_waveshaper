@@ -11,6 +11,7 @@ use winit::{
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+// Structure that packages info needed for each instance of the vertex shader
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
@@ -18,6 +19,7 @@ struct Vertex {
     color:[f32;3]
 }
 
+// Structure that packages info that is shared by shader cores that is copied to the GPU in shared read-only memory
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct GraphicsInput {
@@ -26,19 +28,21 @@ struct GraphicsInput {
     canvas_dimensions:[u32;4],
 }
 
+// Structure that contains all info needed to render a segment of the visual representation of the wave, besides the actual geometry of the card
+// segment ranges from the x coordinate to the xcoord of its right neighbor
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct CircleInstance {
+struct Anchor {
     position:[f32;3],
     right_nbr_pos:[f32;3],
     scale:f32
 }
-impl CircleInstance {
+impl Anchor {
     // returns a vertex buffer layout used for storing this data type in a Vertex Buffer
     // TODO: I think my issue has gotta be origniating here... Idk how tho, look up how vertexbufferlayout works again
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout{
-            array_stride: std::mem::size_of::<CircleInstance>() as wgpu::BufferAddress,
+            array_stride: std::mem::size_of::<Anchor>() as wgpu::BufferAddress,
             // We need to switch from using a step mode of Vertex to Instance
             // This means that our shaders will only change to use the next
             // instance when the shader starts processing a new instance
@@ -64,6 +68,16 @@ impl CircleInstance {
     }
 }
 
+// For now this struct is simply the way that Everything is packaged when I want to export the visual state of the wave
+// but in the future it couple be used for better decoupling of the visual wave state from the rendering engine, 
+// so that multiple visual layers can be rendered with the same engine setup
+// Stores the anchors and the coord system transforms, because they can be used to determine which anchors are in scope
+pub struct VisualState {
+    anchors:Vec<Anchor>,
+    world_to_clip:[[f32;4];4],
+    clip_to_world:[[f32;4];4]
+}
+
 // TODO: move this to a "shapes" module
 // define triangles that fill the screen
 // to accomodate this setup in the render pipeline config settings, the topology is set to "strip"
@@ -76,72 +90,71 @@ const VERTICES:&[Vertex] = &[
     Vertex{position: [-1.0, -1.0, 1.0], color: [0.0, 1.0, 0.0]}, // bottom left
 
     // Circle
-    Vertex{ position: [ 0.000000, -1.000000, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.098017, -0.995185, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.195090, -0.980785, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.290285, -0.956940, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.382683, -0.923880, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.471397, -0.881921, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.555570, -0.831470, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.634393, -0.773010, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.707107, -0.707107, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.773010, -0.634393, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.831470, -0.555570, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.881921, -0.471397, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.923880, -0.382683, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.956940, -0.290285, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.980785, -0.195090, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.995185, -0.098017, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-1.000000,  0.000000, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.995185,  0.098017, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.980785,  0.195090, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.956940,  0.290285, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.923880,  0.382683, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.881921,  0.471397, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.831470,  0.555570, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.773010,  0.634393, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.707107,  0.707107, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.634393,  0.773010, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.555570,  0.831470, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.471397,  0.881921, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.382683,  0.923880, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.290285,  0.956940, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.195090,  0.980785, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [-0.098017,  0.995185, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.000000,  1.000000, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.098017,  0.995185, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.195090,  0.980785, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.290285,  0.956940, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.382683,  0.923880, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.471397,  0.881921, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.555570,  0.831470, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.634393,  0.773010, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.707107,  0.707107, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.773010,  0.634393, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.831470,  0.555570, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.881921,  0.471397, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.923880,  0.382683, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.956940,  0.290285, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.980785,  0.195090, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.995185,  0.098017, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 1.000000,  0.000000, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.995185, -0.098017, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.980785, -0.195090, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.956940, -0.290285, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.923880, -0.382683, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.881921, -0.471397, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.831470, -0.555570, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.773010, -0.634393, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.707107, -0.707107, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.634393, -0.773010, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.555570, -0.831470, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.471397, -0.881921, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.382683, -0.923880, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.290285, -0.956940, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.195090, -0.980785, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.098017, -0.995185, 0.4], color: [1.0, 0.0, 1.0] },
-    Vertex{ position: [ 0.000000,  0.000000, 0.4], color: [1.0, 0.0, 1.0] },
-
+    Vertex{ position: [ 0.000000, -1.000000, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.098017, -0.995185, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.195090, -0.980785, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.290285, -0.956940, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.382683, -0.923880, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.471397, -0.881921, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.555570, -0.831470, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.634393, -0.773010, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.707107, -0.707107, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.773010, -0.634393, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.831470, -0.555570, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.881921, -0.471397, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.923880, -0.382683, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.956940, -0.290285, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.980785, -0.195090, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.995185, -0.098017, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-1.000000,  0.000000, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.995185,  0.098017, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.980785,  0.195090, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.956940,  0.290285, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.923880,  0.382683, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.881921,  0.471397, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.831470,  0.555570, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.773010,  0.634393, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.707107,  0.707107, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.634393,  0.773010, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.555570,  0.831470, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.471397,  0.881921, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.382683,  0.923880, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.290285,  0.956940, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.195090,  0.980785, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [-0.098017,  0.995185, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.000000,  1.000000, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.098017,  0.995185, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.195090,  0.980785, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.290285,  0.956940, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.382683,  0.923880, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.471397,  0.881921, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.555570,  0.831470, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.634393,  0.773010, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.707107,  0.707107, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.773010,  0.634393, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.831470,  0.555570, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.881921,  0.471397, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.923880,  0.382683, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.956940,  0.290285, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.980785,  0.195090, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.995185,  0.098017, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 1.000000,  0.000000, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.995185, -0.098017, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.980785, -0.195090, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.956940, -0.290285, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.923880, -0.382683, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.881921, -0.471397, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.831470, -0.555570, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.773010, -0.634393, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.707107, -0.707107, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.634393, -0.773010, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.555570, -0.831470, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.471397, -0.881921, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.382683, -0.923880, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.290285, -0.956940, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.195090, -0.980785, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.098017, -0.995185, 0.1], color: [1.0, 0.0, 1.0] },
+    Vertex{ position: [ 0.000000,  0.000000, 0.1], color: [1.0, 0.0, 1.0] },
     // WaveCard
     Vertex{position: [ 1.0,  0.5, 0.5], color: [1.0, 0.0, 0.0]}, // top right
     Vertex{position: [ 0.0,  0.5, 0.5], color: [0.0, 0.0, 0.0]}, // top left
@@ -291,8 +304,8 @@ pub struct State {
     tri_index_buffer: wgpu::Buffer,
     num_tri_indices: u32,
 
-    circle_instances: Vec<CircleInstance>,
-    circle_instances_buffer: wgpu::Buffer,
+    anchor_instances: Vec<Anchor>,
+    anchor_instances_buffer: wgpu::Buffer,
 }
 impl State {
 
@@ -378,17 +391,17 @@ impl State {
         });
         let num_tri_indices = TRI_INDEX_BUFFER.len() as u32;
 
-        let circle_instances: [CircleInstance; 0] = [
-            // CircleInstance {
+        let anchor_instances: [Anchor; 0] = [
+            // Anchor {
             //     position:[-10.0, 0.0, 0.0], // -10 is a magic number that ensures the first node is flush with the left of screen
             //     scale:1.0, //TODO: bruh this is a hack, figure this shit out
             //     right_nbr_pos:[10.0, 0.0, 0.0], // TODO: 10 is a migic num and this is a placeholder nyways
             // },
         ];
-        let circle_instances_buffer = device.create_buffer_init(
+        let anchor_instances_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Circle Instance Buffer"),
-                contents: bytemuck::cast_slice(&circle_instances),
+                contents: bytemuck::cast_slice(&anchor_instances),
                 usage: wgpu::BufferUsages::VERTEX,
             }
         );
@@ -503,7 +516,7 @@ impl State {
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: "vert_main",
-                    buffers: &[vertex_buffer_layout, CircleInstance::desc()],
+                    buffers: &[vertex_buffer_layout, Anchor::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
@@ -560,8 +573,8 @@ impl State {
             tri_index_buffer,
             num_tri_indices,
 
-            circle_instances:circle_instances.to_vec(),
-            circle_instances_buffer
+            anchor_instances:anchor_instances.to_vec(),
+            anchor_instances_buffer
         }
     }
 
@@ -588,34 +601,34 @@ impl State {
         );
     }
 
-    fn update_circle_instances_buf(&mut self){
+    fn update_anchor_instances_buf(&mut self){
         // Write the entire instances buffer again to new buffer 
         // TODO: this is bad, use offset instead if there is extra capacity, reset the buff once it has reach capacity
         //self.cursor_pos_buffer.unmap();
-        self.circle_instances_buffer = self.device.create_buffer_init(
+        self.anchor_instances_buffer = self.device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Circle Instance Buffer, Grown"),
-                contents: bytemuck::cast_slice(&self.circle_instances.as_slice()),
+                contents: bytemuck::cast_slice(&self.anchor_instances.as_slice()),
                 usage: wgpu::BufferUsages::VERTEX,
             }
         );
     }
 
     pub fn add_circle_instance(&mut self, world_position:[f32;3], scale:f32) {
-        let new_circle = CircleInstance {
+        let new_circle = Anchor {
             position:world_position,
             right_nbr_pos:[world_position[0], 0.0, 0.0], //TODO: placeholder neighbor pos
             scale:scale,
         };
 
         // if empty list, populate the head, else search for place within list where this fits
-        match self.circle_instances.is_empty() {
+        match self.anchor_instances.is_empty() {
             true => {
-                self.circle_instances.push(new_circle);
+                self.anchor_instances.push(new_circle);
             },
             false => {
                 // search for where this circle fits in this list of circles ordered by x axis position
-                let res = self.circle_instances.binary_search_by(|probe| probe.position[0].total_cmp(&new_circle.position[0]));
+                let res = self.anchor_instances.binary_search_by(|probe| probe.position[0].total_cmp(&new_circle.position[0]));
                 match res {
                     Ok(index) => {
                         // binary search was able to find an element at this exact position in the node list, don't add
@@ -624,38 +637,38 @@ impl State {
                     Err(index) => {
                         // binary search could not find a node at this wave position, tells us the index of where it 
                         // would be in the list if it existed, use that to insert the node and preserve sort by wave pos
-                        self.circle_instances.insert(index, new_circle);
+                        self.anchor_instances.insert(index, new_circle);
                         // update the right neighbor
-                        self.circle_instances[index].right_nbr_pos = self.circle_instances[(index + 1) % self.circle_instances.len()].position;
+                        self.anchor_instances[index].right_nbr_pos = self.anchor_instances[(index + 1) % self.anchor_instances.len()].position;
                         // update the right neighbor of this new nodes left neighbor
                         // extra logic allows end of list to have right neighbor at begining of list
-                        let num_circs = self.circle_instances.len(); // need this bc we cant borrow within borrow on next line
-                        self.circle_instances[(index + num_circs - 1) % num_circs].right_nbr_pos = self.circle_instances[index].position;
+                        let num_circs = self.anchor_instances.len(); // need this bc we cant borrow within borrow on next line
+                        self.anchor_instances[(index + num_circs - 1) % num_circs].right_nbr_pos = self.anchor_instances[index].position;
                         log::warn!("node added at index: {}", index);
                     }
                 }
             }
         }
         
-        log::warn!("Content of instances is: {:?}",self.circle_instances);
+        log::warn!("Content of instances is: {:?}", self.anchor_instances);
 
-        self.update_circle_instances_buf();
+        self.update_anchor_instances_buf();
     }
 
     // copy the visual state of the wave and shift it to the end of the current wave
     // TODO: this double the wave length, DANGEROUS! can get out of hand exponentially
     // fn extend_wave(&mut self){
-    //     let new_circle = CircleInstance {
+    //     let new_circle = Anchor {
     //         position:[0.0, 0.0, 0.0],
     //         right_nbr_pos:[0.0, 0.0, 0.0],
     //         scale:1.0,
     //     };
 
-    //     self.circle_instances.resize(self.circle_instances.len(), new_circle);
+    //     self.anchor_instances.resize(self.anchor_instances.len(), new_circle);
 
     //     // iterate through second half of array, populating it with elems from the first
-    //     for curr_index in 0..(self.circle_instances.len() / 2) {
-    //         self.circle_instances[curr_index + (self.circle_instances.len() / 2)] = self.circle_instances[curr_index];
+    //     for curr_index in 0..(self.anchor_instances.len() / 2) {
+    //         self.anchor_instances[curr_index + (self.anchor_instances.len() / 2)] = self.anchor_instances[curr_index];
 
 
     //     }
@@ -666,7 +679,7 @@ impl State {
     // todo: move this to a compute shader once you figure out how that can cooperate with the current browsers
     pub fn circle_at_location(&self, target_world_pos:[f32; 2]) -> Option<usize> {
         let mut index = 0;
-        for circle in &self.circle_instances {
+        for circle in &self.anchor_instances {
             // calculate vector between origin of this circle instance and passed position
             let diff_vector:[f32;2] = [circle.position[0] - target_world_pos[0], circle.position[1] - target_world_pos[1]];
             // helps rule out circles before doing proper distance calculation
@@ -682,7 +695,7 @@ impl State {
     }
 
     pub fn expand_circle(&mut self, circle_index:usize) -> Result<(), &str> {
-        if circle_index < self.circle_instances.len() {
+        if circle_index < self.anchor_instances.len() {
             // do something visually to the circle now that it has been clicked? idk
         }
         Err("index out of bounds")
@@ -841,17 +854,17 @@ impl State {
             // Designate a vertex buffer
             // The reason "slice" is used is because we can store many objects in a single vertex buffer
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.circle_instances_buffer.slice(..)); // set the instance buffer
+            render_pass.set_vertex_buffer(1, self.anchor_instances_buffer.slice(..)); // set the instance buffer
             render_pass.set_index_buffer(self.tri_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
             // draw something with 4 vertices, and 1 instance. This is where @builtin(vertex_index) comes from in the vert shader wgsl code TODO: comment doesn't make sense
-            if self.circle_instances.len() > 0 {
+            if self.anchor_instances.len() > 0 {
                 // TODO: these should prob be on separate (render passes?), shaders, etc. Like... the draw command for the background plane
                 // probably should have no concept of the circle instances: different vert bufs, etc. It's a bit of a tricky thing to go back and untangle
                 render_pass.draw_indexed(0..6, 0, 0..1); // draw background, remember range is not max inclusive
-                render_pass.draw_indexed(6..self.num_tri_indices, 0, 0..self.circle_instances.len() as u32); // draw circles
+                render_pass.draw_indexed(6..self.num_tri_indices, 0, 0..self.anchor_instances.len() as u32); // draw circles
             }
         }
 
@@ -911,6 +924,15 @@ impl State {
                 self.window().request_redraw();
             }
             _ => {}
+        }
+    }
+
+    // used by lib rs to get a simplified version of the current state
+    pub fn export_visual_state(&self) -> VisualState {
+        VisualState { 
+            anchors:self.anchor_instances,
+            world_to_clip: self.world_to_clip_transform,
+            clip_to_world: self.clip_to_world_transform
         }
     }
 }
