@@ -927,14 +927,14 @@ impl State {
         }
     }
 
-    // used by lib rs to get a simplified version of the current state
-    pub fn export_visual_state(&self) -> VisualState {
-        VisualState { 
-            anchors:self.anchor_instances,
-            world_to_clip: self.world_to_clip_transform,
-            clip_to_world: self.clip_to_world_transform
-        }
-    }
+    // TODO: will be used by lib rs to get a simplified version of the current state
+    // pub fn export_visual_state(&self) -> VisualState {
+    //     VisualState { 
+    //         anchors:self.anchor_instances,
+    //         world_to_clip: self.world_to_clip_transform,
+    //         clip_to_world: self.clip_to_world_transform
+    //     }
+    // }
 }
 
 
