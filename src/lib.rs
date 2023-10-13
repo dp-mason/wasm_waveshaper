@@ -10,7 +10,7 @@ use winit::{
 use web_sys;
 use wasm_bindgen::prelude::*;
 
-//converts an entire exported visual state to a format that the audio renderer can recognize as a wave shape
+// TODO: converts an entire exported visual state to a format that the audio renderer can recognize as a wave shape
 // based on the anchors in the visual state and whether the anchors are in scope
 fn wave_shape_from_visual_state(visual_state:rendering::VisualState) -> Vec<audio::WaveNode> {
     // TODO: use filter pattern here in the spirit of functional programming
@@ -41,9 +41,11 @@ impl ShaperState {
                         match (button, state) {
                             (MouseButton::Left, ElementState::Pressed) => {
                                 let new_node_loc = self.render_state.get_cursor_clip_location();
-                                self.render_state.add_circle_at_clip_location(new_node_loc);
-                                self.sound_engine.add_node( ((new_node_loc[0] + 1.0) / 2.0), new_node_loc[1]);
-                                self.sound_engine.print_node_list();
+                                // if the visual state successfully added a new anchor, add a new anchor to the sound state
+                                if self.render_state.add_circle_at_clip_location(new_node_loc) {
+                                    self.sound_engine.add_node( (new_node_loc[0] + 1.0) / 2.0, new_node_loc[1]);
+                                    self.sound_engine.print_node_list();
+                                }
                             },
                             _ => {}
                         }

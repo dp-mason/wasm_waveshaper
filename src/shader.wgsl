@@ -5,7 +5,6 @@ struct VertexOutput {
     @location(0) color:vec3<f32>, // TODO: are we overwriting the vert buffer (position part that is at loc 0) ??
     @location(2) slope_intercept:vec2<f32>,
     @location(3) world_pos:vec3<f32>,
-    @location(4) is_card:u32,
 };
 
 // !!! WGSL INTERPRETS MATRICES AS SETS OF COLUMN VECTORS !!!
@@ -35,28 +34,15 @@ fn vert_main(
     var return_data:VertexOutput;
     // write some data to the vertex's position attribute, THIS VALUE WILL BE CHANGED INBETWEEN THE VERT AND FRAG SHADERS
     // TODO: 67 is a magic number repesenting the total verts that make up the background plane and the circle node
-    if(vert_index < 69u){
+    if(vert_index < 4u){
         
-        if(vert_index < 4u){
-            // the vert shader for the background and circle
-            return_data.position = vec4<f32>(world_position, 1.0); // dont transform to clip space, the background coords are actually already in clip space
-            // color of background plane corresponds with the UV coords of the plane
-            return_data.color = vec3<f32>(color[0], color[1], 0.0);
-        }
-        else {
-            // the vert shader for the background and circle
-            return_data.position = graphics_input.world_to_clip_transfm * vec4<f32>(world_position + vec3(instance_pos[0], instance_pos[1], 0.0), 1.0); // dont transform to clip space, the background coords are actually already in clip space
-            // color of the circle
-            return_data.color = vec3<f32>(0.7, 0.1, 1.0);
-        }
-
-        // data that stores whather this vert makes up part of the card used to display the wave visualization
-        return_data.is_card = 0u;
+        // the vert shader for the background and circle
+        return_data.position = vec4<f32>(world_position, 1.0); // dont transform to clip space, the background coords are actually already in clip space
+        // color of background plane corresponds with the UV coords of the plane
+        return_data.color = vec3<f32>(color[0], color[1], 0.0);
 
         return return_data; // doesn't need anything else if it is the background 
     }
-    
-    return_data.is_card = 1u;
     
     // nbr_wrap is a value that enables the wave shape visualization to extend past the right border of the screen
     // it will onlt apply to circle instances that are on the furthest right point of the screen
@@ -124,11 +110,6 @@ fn frag_main(
         }
     }
 
-    if vert_data.is_card < 1u {
-        //leave early bc this wave viz stuff doesn't apply to the background plane
-        return vec4<f32>(vert_data.color, 1.0); // print the vertex color
-    }
-
     // if this fragment falls between the waveshaping line and the zero baseline, shade it in
     if ( (vert_data.world_pos[1] < (vert_data.slope_intercept[0] * vert_data.world_pos[0]) + vert_data.slope_intercept[1] && 
          vert_data.world_pos[1] > 0.0) ||
@@ -141,5 +122,5 @@ fn frag_main(
     
     // transparent, because not in area under the waveshape, shows the webpage background not background plane :(
     // there must need to be multiple draw calls if I want one plane rendered on top of the other?
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    return vec4<f32>(.0, 0.0, 0.0, 0.0);
 }
