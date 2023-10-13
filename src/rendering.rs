@@ -677,15 +677,15 @@ impl State {
     // takes a position in clip space (usually the mouse location) and returns the index of the circle instance
     // that exists there if one exists
     // todo: move this to a compute shader once you figure out how that can cooperate with the current browsers
-    pub fn circle_at_location(&self, target_world_pos:[f32; 2]) -> Option<usize> {
+    pub fn circle_at_location(&self, target_world_pos:[f32; 2], radius:f32) -> Option<usize> {
         let mut index = 0;
         for circle in &self.anchor_instances {
             // calculate vector between origin of this circle instance and passed position
             let diff_vector:[f32;2] = [circle.position[0] - target_world_pos[0], circle.position[1] - target_world_pos[1]];
             // helps rule out circles before doing proper distance calculation
-            if !(diff_vector[0].abs() > circle.scale || diff_vector[1].abs() > circle.scale) {
+            if !(diff_vector[0].abs() > radius || diff_vector[1].abs() > radius) {
                 let dist = (diff_vector[0].powf(2.0) + diff_vector[1].powf(2.0)).sqrt();
-                if dist < circle.scale {
+                if dist < radius {
                     return Some(index);
                 }
             }
@@ -727,7 +727,7 @@ impl State {
         let world_loc = dot_product(self.clip_to_world_transform, clip_loc);
             
         // determine whether the clicked position is within an existing circle
-        match self.circle_at_location([world_loc[0], world_loc[1]]) {
+        match self.circle_at_location([world_loc[0], world_loc[1]], 0.1) {
             Some(index) => {
                 log::warn!("Clicked circle at index: {index}");
                 false
